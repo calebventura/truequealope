@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
+import Link from "next/link";
+import { Button } from "@/components/ui/Button";
 
 export const Navbar = () => {
   return (
@@ -9,16 +9,24 @@ export const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
-              <span className="text-2xl font-bold text-blue-600">Reutilizalope</span>
+              <span className="text-2xl font-bold text-blue-600">
+                Reutilizalope
+              </span>
             </Link>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link href="/buscar" className="text-gray-600 hover:text-blue-600 transition-colors">
+            <Link
+              href="/buscar"
+              className="text-gray-600 hover:text-blue-600 transition-colors"
+            >
               Explorar
             </Link>
-            <Link href="/categorias" className="text-gray-600 hover:text-blue-600 transition-colors">
+            <Link
+              href="/categorias"
+              className="text-gray-600 hover:text-blue-600 transition-colors"
+            >
               Categorías
             </Link>
           </div>
