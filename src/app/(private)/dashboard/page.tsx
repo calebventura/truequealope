@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.push("/login");
+      router.push("/auth/login");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     }

@@ -59,7 +59,7 @@ export default function NewProductPage() {
 
   // Redirigir si no está autenticado (aunque el layout protegido ya debería hacerlo)
   if (!authLoading && !user) {
-    router.push("/login");
+    router.push("/auth/login");
     return null;
   }
 
