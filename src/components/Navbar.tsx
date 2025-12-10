@@ -24,30 +24,16 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="border-b border-gray-200 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 justify-between items-center">
-          {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center">
-              <span className="text-2xl font-bold text-blue-600">
-                Reutilizalope
-              </span>
-            </Link>
-          </div>
+    <nav className="bg-white shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap md:flex-nowrap items-center justify-between py-3 md:h-16 gap-4 md:gap-0">
+          {/* Logo - Order 1 on mobile */}
+          <Link href="/" className="text-xl font-bold text-indigo-600 order-1">
+            ReutilizaLope
+          </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link
-              href="/search"
-              className="text-gray-600 hover:text-blue-600 transition-colors"
-            >
-              Explorar
-            </Link>
-          </div>
-
-          {/* Search Bar (Desktop) */}
-          <div className="hidden md:block flex-1 max-w-md mx-8">
+          {/* Search Bar - Order 3 on mobile (new row), Order 2 on desktop */}
+          <div className="w-full order-3 md:order-2 md:flex-1 md:max-w-md md:mx-8">
              <form onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
@@ -55,38 +41,30 @@ export const Navbar = () => {
                 if (input.value.trim()) {
                     router.push(`/search?q=${encodeURIComponent(input.value)}`);
                 }
-             }}>
-                <div className="relative">
-                  <input 
-                    name="q"
-                    type="text" 
-                    placeholder="Buscar productos..." 
-                    className="w-full pl-10 pr-4 py-1.5 rounded-full border border-gray-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                  />
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                </div>
-             </form>
+             }} className="relative">
+              <input
+                name="q"
+                type="text"
+                placeholder="Buscar productos..."
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base"
+              />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </form>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center space-x-4">
-            <Link href="/products/new">
-              <Button variant="outline" size="sm">
-                + Vender
-              </Button>
-            </Link>
-
+          {/* User Menu - Order 2 on mobile, Order 3 on desktop */}
+          <div className="flex items-center gap-4 order-2 md:order-3">
             {loading ? (
-              <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+               <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
             ) : user ? (
-              <div className="relative">
-                <button
+              <div className="relative group">
+                <button 
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="flex items-center space-x-2 focus:outline-none"
+                  className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
                 >
                   {user.photoURL ? (
                     <Image
@@ -97,37 +75,40 @@ export const Navbar = () => {
                       className="rounded-full object-cover border border-gray-200"
                     />
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                      {user.displayName ? user.displayName[0].toUpperCase() : user.email?.[0].toUpperCase()}
+                    <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                      {user.displayName ? user.displayName[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : 'U')}
                     </div>
                   )}
-                  <span className="hidden md:block text-sm font-medium text-gray-700">
-                    {user.displayName || user.email}
-                  </span>
+                  <span className="hidden sm:inline">{user.displayName || user.email}</span>
                 </button>
-
-                {/* Dropdown Menu */}
-                {isMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
-                    <div className="px-4 py-2 border-b border-gray-100">
+                {/* Dropdown */}
+                <div className={`absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 border ${isMenuOpen ? 'block' : 'hidden'} md:group-hover:block`}>
+                  <div className="px-4 py-2 border-b border-gray-100 md:hidden">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {user.displayName || "Usuario"}
                       </p>
                       <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                    </div>
-                    <Link
+                  </div>
+                  <Link
+                    href="/dashboard"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Mis Productos
+                  </Link>
+                  <Link
+                    href="/products/new"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Vender Producto
+                  </Link>
+                  <Link
                       href="/profile"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Mi Perfil
-                    </Link>
-                    <Link
-                      href="/dashboard"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Mis Publicaciones
                     </Link>
                     <Link
                       href="/mis-compras"
@@ -136,24 +117,32 @@ export const Navbar = () => {
                     >
                       Mis Compras
                     </Link>
-                    <button
-                      onClick={() => {
+                  <button
+                    onClick={() => {
                         setIsMenuOpen(false);
                         handleLogout();
                       }}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                    >
-                      Cerrar Sesión
-                    </button>
-                  </div>
-                )}
+                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                  >
+                    Cerrar Sesión
+                  </button>
+                </div>
               </div>
             ) : (
-              <Link href="/auth/login">
-                <Button variant="primary" size="sm">
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/auth/login"
+                  className="text-gray-700 hover:text-indigo-600 font-medium text-sm sm:text-base"
+                >
                   Ingresar
-                </Button>
-              </Link>
+                </Link>
+                <Link
+                  href="/auth/register"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base"
+                >
+                  Registro
+                </Link>
+              </div>
             )}
           </div>
         </div>

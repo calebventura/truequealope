@@ -121,7 +121,7 @@ export default function NewProductPage() {
           <input
             type="text"
             {...register("title")}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
             placeholder="Ej: Bicicleta de montaña Trek"
           />
           {errors.title && (
@@ -137,7 +137,7 @@ export default function NewProductPage() {
           <textarea
             {...register("description")}
             rows={4}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
             placeholder="Describe los detalles, estado y características..."
           />
           {errors.description && (
@@ -157,7 +157,7 @@ export default function NewProductPage() {
               type="number"
               step="0.01"
               {...register("price", { valueAsNumber: true })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
             />
             {errors.price && (
               <p className="mt-1 text-xs text-red-500">
@@ -173,7 +173,7 @@ export default function NewProductPage() {
             </label>
             <select
               {...register("categoryId")}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base bg-white"
             >
               <option value="">Selecciona una categoría</option>
               {CATEGORIES.map((cat) => (
@@ -198,7 +198,7 @@ export default function NewProductPage() {
             </label>
             <select
               {...register("condition")}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base bg-white"
             >
               <option value="">Selecciona el estado</option>
               {CONDITIONS.map((cond) => (
@@ -222,7 +222,7 @@ export default function NewProductPage() {
             <input
               type="text"
               {...register("location")}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
               placeholder="Ej: Palermo, Buenos Aires"
             />
             {errors.location && (

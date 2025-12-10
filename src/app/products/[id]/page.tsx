@@ -235,7 +235,7 @@ export default function ProductDetailPage() {
                   <p>{product.description}</p>
                 </div>
 
-                <div className="mt-8 pt-8 border-t border-gray-200 flex flex-col gap-3">
+                <div className="mt-8 pt-8 border-t border-gray-200">
                   {user?.uid !== product.sellerId ? (
                     <>
                       {product.status === 'sold' ? (
@@ -244,7 +244,7 @@ export default function ProductDetailPage() {
                             <p className="text-sm mt-1">Busca otros productos similares en el catálogo.</p>
                         </div>
                       ) : (
-                        <>
+                        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none">
                           <button
                             onClick={handleBuy}
                             disabled={buying || contacting || product.status === 'reserved'}
@@ -291,7 +291,7 @@ export default function ProductDetailPage() {
                               ? "Iniciando chat..."
                               : "Contactar al Vendedor"}
                           </button>
-                        </>
+                        </div>
                       )}
                     </>
                   ) : (
@@ -315,6 +315,8 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
+                {/* Spacer for mobile sticky footer */}
+                <div className="h-32 md:hidden"></div>
               </div>
             </div>
           </div>

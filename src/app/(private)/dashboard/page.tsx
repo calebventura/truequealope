@@ -194,103 +194,104 @@ export default function DashboardPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            <ul className="divide-y divide-gray-200">
-              {displayedProducts.map((product) => (
-                <li key={product.id}>
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-1 min-w-0">
-                        <div className="flex-shrink-0 h-16 w-16 relative rounded-md overflow-hidden border border-gray-200">
-                          {product.images && product.images[0] ? (
-                            <Image 
-                              src={product.images[0]} 
-                              alt={product.title} 
-                              fill 
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-gray-100 flex items-center justify-center text-xs text-gray-400">Sin foto</div>
-                          )}
-                        </div>
-                        <div className="ml-4 flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-blue-600 truncate">
-                              <Link href={`/products/${product.id}`} className="hover:underline">
-                                {product.title}
-                              </Link>
-                            </p>
-                            <div className="ml-2 flex-shrink-0 flex">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+          <div className="space-y-4">
+            {displayedProducts.map((product) => (
+              <div
+                key={product.id}
+                className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 gap-4 bg-white shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="relative h-16 w-16 flex-shrink-0">
+                    <Image
+                      src={product.images[0] || "https://placehold.co/100x100"}
+                      alt={product.title}
+                      fill
+                      className="object-cover rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                        <Link href={`/products/${product.id}`} className="hover:underline">
+                            {product.title}
+                        </Link>
+                    </h3>
+                    <p className="text-indigo-600 font-bold">
+                      {new Intl.NumberFormat("es-CL", {
+                        style: "currency",
+                        currency: "CLP",
+                      }).format(product.price)}
+                    </p>
+                    <p className="text-sm text-gray-500 md:hidden">
+                      {product.createdAt.toLocaleDateString()}
+                    </p>
+                    <div className="mt-1 md:hidden">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                 ${product.status === 'active' ? 'bg-green-100 text-green-800' : 
                                   product.status === 'reserved' ? 'bg-yellow-100 text-yellow-800' : 
                                   'bg-gray-100 text-gray-800'}`}>
                                 {product.status === 'active' ? 'Activo' : 
                                  product.status === 'reserved' ? 'Reservado' : 'Vendido'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-2 flex justify-between items-center">
-                            <div className="sm:flex flex-col">
-                              <div className="flex gap-6">
-                                <p className="flex items-center text-sm text-gray-500">
-                                    ${product.price.toLocaleString()}
-                                </p>
-                                <p className="flex items-center text-sm text-gray-500">
-                                    {product.createdAt.toLocaleDateString()}
-                                </p>
-                              </div>
-                              {/* Mostrar interesados solo si el producto no está vendido (o si quieres historial también) */}
-                              {user && <ProductInterests productId={product.id!} sellerId={user.uid} />}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                        </span>
                     </div>
-                    <div className="mt-4 flex justify-end space-x-3 border-t pt-4">
+                  </div>
+                </div>
+                
+                <div className="hidden md:block text-sm text-gray-500">
+                  {product.createdAt.toLocaleDateString()}
+                </div>
+
+                <div className="hidden md:block">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${product.status === 'active' ? 'bg-green-100 text-green-800' : 
+                                product.status === 'reserved' ? 'bg-yellow-100 text-yellow-800' : 
+                                'bg-gray-100 text-gray-800'}`}>
+                            {product.status === 'active' ? 'Activo' : 
+                                product.status === 'reserved' ? 'Reservado' : 'Vendido'}
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
                       {product.status !== 'sold' ? (
                         <>
                           {product.status === 'active' ? (
                             <button
                               onClick={() => handleStatusChange(product.id!, 'reserved')}
-                              className="text-sm text-yellow-600 hover:text-yellow-900 font-medium"
+                              className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-yellow-600 bg-yellow-50 rounded-md hover:bg-yellow-100"
                             >
-                              Marcar Reservado
+                              Reservar
                             </button>
                           ) : (
                             <button
                               onClick={() => handleStatusChange(product.id!, 'active')}
-                              className="text-sm text-green-600 hover:text-green-900 font-medium"
+                              className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100"
                             >
-                              Marcar Disponible
+                              Disponible
                             </button>
                           )}
                           <button
                             onClick={() => handleStatusChange(product.id!, 'sold')}
-                            className="text-sm text-blue-600 hover:text-blue-900 font-medium"
+                            className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
                           >
-                            Marcar Vendido
+                            Vendido
                           </button>
                         </>
                       ) : (
                         <button
                             onClick={() => handleStatusChange(product.id!, 'active')}
-                            className="text-sm text-green-600 hover:text-green-900 font-medium"
+                            className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100"
                         >
-                            Republicar (Reactivar)
+                            Republicar
                         </button>
                       )}
                       <button
                         onClick={() => handleStatusChange(product.id!, 'deleted')}
-                        className="text-sm text-red-600 hover:text-red-900 font-medium"
+                        className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
                       >
                         Eliminar
                       </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

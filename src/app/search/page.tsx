@@ -89,24 +89,22 @@ function SearchContent() {
         {/* Filtros */}
         <div className="bg-white p-4 rounded-lg shadow-sm mb-8">
           <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label htmlFor="search" className="sr-only">Buscar</label>
+            <div className="flex-1 relative">
               <input
                 type="text"
                 id="search"
                 placeholder="¿Qué estás buscando?"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-4 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <div className="w-full md:w-64">
-              <label htmlFor="category" className="sr-only">Categoría</label>
+            <div className="w-full md:w-48">
               <select
                 id="category"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="">Todas las categorías</option>
                 {CATEGORIES.map((cat) => (
@@ -118,7 +116,7 @@ function SearchContent() {
             </div>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium"
+              className="w-full md:w-auto bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
             >
               Buscar
             </button>

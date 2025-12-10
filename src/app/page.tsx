@@ -54,15 +54,16 @@ export default function HomePage() {
         
         {/* Categorías */}
         <div className="mb-12">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Categorías</h2>
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-            {CATEGORIES.map((cat) => (
-              <Link 
-                key={cat.id} 
-                href={`/search?category=${cat.id}`}
-                className="flex-shrink-0 bg-white px-6 py-3 rounded-full shadow-sm hover:shadow-md hover:bg-blue-50 transition-all border border-gray-100 whitespace-nowrap text-gray-700 font-medium"
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Categorías</h2>
+          <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-hide snap-x snap-mandatory">
+            {CATEGORIES.map((category) => (
+              <Link
+                key={category.id}
+                href={`/search?category=${category.id}`}
+                className="flex-shrink-0 w-32 h-32 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 hover:shadow-md transition-shadow border border-gray-100 snap-start"
               >
-                {cat.name}
+                <span className="text-3xl">{category.icon}</span>
+                <span className="font-medium text-gray-900 text-sm text-center px-2">{category.name}</span>
               </Link>
             ))}
           </div>
@@ -83,11 +84,11 @@ export default function HomePage() {
             <p className="text-gray-500 text-lg">No hay productos activos en este momento.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {products.map((product) => (
               <Link key={product.id} href={`/products/${product.id}`} className="group">
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
-                  <div className="relative h-48 w-full bg-gray-200">
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
+                  <div className="relative aspect-square w-full bg-gray-200">
                     {product.status === 'reserved' && (
                       <div className="absolute top-2 right-2 z-10 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
                         Reservado

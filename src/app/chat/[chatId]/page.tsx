@@ -113,7 +113,7 @@ export default function ChatPage() {
   if (loading) return <div className="p-8 text-center">Cargando chat...</div>;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-100">
+    <div className="flex flex-col h-[calc(100dvh-64px)] md:h-[calc(100vh-64px)] bg-gray-100">
       {/* Header del Chat */}
       <div className="bg-white border-b px-4 py-3 shadow-sm flex justify-between items-center">
         <div>

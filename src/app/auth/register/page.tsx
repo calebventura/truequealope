@@ -77,7 +77,7 @@ export default function RegisterPage() {
             <input
               {...register("name")}
               type="text"
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.name && (
               <p className="mt-1 text-xs text-red-500">
@@ -95,7 +95,7 @@ export default function RegisterPage() {
             <input
               {...register("email")}
               type="email"
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.email && (
               <p className="mt-1 text-xs text-red-500">
@@ -113,7 +113,7 @@ export default function RegisterPage() {
             <input
               {...register("password")}
               type="password"
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.password && (
               <p className="mt-1 text-xs text-red-500">
@@ -131,7 +131,7 @@ export default function RegisterPage() {
             <input
               {...register("confirmPassword")}
               type="password"
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.confirmPassword && (
               <p className="mt-1 text-xs text-red-500">
