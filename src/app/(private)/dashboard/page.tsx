@@ -10,21 +10,40 @@ import { Product } from "@/types/product";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { AvatarStack } from "@/components/ui/AvatarStack";
+import { useProductInterests } from "@/hooks/useProductInterests";
+
+// Componente auxiliar para mostrar los interesados de un producto
+const ProductInterests = ({ productId, sellerId }: { productId: string, sellerId: string }) => {
+  const { interestedUsers, loading } = useProductInterests(productId, sellerId);
+  
+  if (loading || interestedUsers.length === 0) return null;
+
+  return (
+    <div className="mt-2">
+      <p className="text-xs text-gray-500 mb-1">Interesados:</p>
+      <AvatarStack users={interestedUsers} />
+    </div>
+  );
+};
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   useEffect(() => {
     const fetchMyProducts = async () => {
       if (!user) return;
       try {
+        // Traemos todos los productos que no estén eliminados
+        // Filtraremos en cliente por pestaña para evitar múltiples queries complejas
         const q = query(
           collection(db, "products"),
           where("sellerId", "==", user.uid),
-          where("status", "!=", "deleted") // No mostrar eliminados
+          where("status", "!=", "deleted") 
         );
         
         const querySnapshot = await getDocs(q);
@@ -34,7 +53,6 @@ export default function DashboardPage() {
           createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date()
         })) as Product[];
 
-        // Ordenar por fecha (más reciente primero) ya que Firestore tiene limitaciones con '!=' y 'orderBy' juntos en ciertos casos sin índice
         productsData.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(productsData);
@@ -51,6 +69,7 @@ export default function DashboardPage() {
   }, [user, authLoading]);
 
   const handleStatusChange = async (productId: string, newStatus: "active" | "reserved" | "sold" | "deleted") => {
+    // ... (lógica existente)
     if (!confirm(`¿Estás seguro de cambiar el estado a ${newStatus === 'deleted' ? 'ELIMINADO' : newStatus}?`)) return;
 
     try {
@@ -77,6 +96,13 @@ export default function DashboardPage() {
     }
   };
 
+  // Filtrar productos según la pestaña activa
+  const displayedProducts = products.filter(p => {
+    if (activeTab === 'active') return p.status === 'active' || p.status === 'reserved';
+    if (activeTab === 'history') return p.status === 'sold';
+    return false;
+  });
+
   if (authLoading) return <div className="p-8 text-center">Cargando...</div>;
 
   return (
@@ -97,7 +123,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Cards (Placeholder for future) */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
@@ -123,27 +149,54 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Mis Publicaciones</h2>
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`${
+                activeTab === 'active'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Activos y Reservados
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`${
+                activeTab === 'history'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Historial de Ventas
+            </button>
+          </nav>
+        </div>
         
         {loadingProducts ? (
           <div className="text-center py-10">Cargando tus productos...</div>
-        ) : products.length === 0 ? (
+        ) : displayedProducts.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No tienes publicaciones</h3>
-            <p className="mt-1 text-sm text-gray-500">Empieza a vender tus productos hoy mismo.</p>
-            <div className="mt-6">
-              <Link href="/products/new">
-                <Button>Crear primera publicación</Button>
-              </Link>
-            </div>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+                {activeTab === 'active' ? 'No tienes publicaciones activas' : 'No tienes ventas registradas'}
+            </h3>
+            {activeTab === 'active' && (
+                <div className="mt-6">
+                <Link href="/products/new">
+                    <Button>Crear primera publicación</Button>
+                </Link>
+                </div>
+            )}
           </div>
         ) : (
           <div className="bg-white shadow overflow-hidden sm:rounded-md">
             <ul className="divide-y divide-gray-200">
-              {products.map((product) => (
+              {displayedProducts.map((product) => (
                 <li key={product.id}>
                   <div className="px-4 py-4 sm:px-6">
                     <div className="flex items-center justify-between">
@@ -178,20 +231,24 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div className="mt-2 flex justify-between items-center">
-                            <div className="sm:flex">
-                              <p className="flex items-center text-sm text-gray-500">
-                                ${product.price.toLocaleString()}
-                              </p>
-                              <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
-                                {product.createdAt.toLocaleDateString()}
-                              </p>
+                            <div className="sm:flex flex-col">
+                              <div className="flex gap-6">
+                                <p className="flex items-center text-sm text-gray-500">
+                                    ${product.price.toLocaleString()}
+                                </p>
+                                <p className="flex items-center text-sm text-gray-500">
+                                    {product.createdAt.toLocaleDateString()}
+                                </p>
+                              </div>
+                              {/* Mostrar interesados solo si el producto no está vendido (o si quieres historial también) */}
+                              {user && <ProductInterests productId={product.id!} sellerId={user.uid} />}
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
                     <div className="mt-4 flex justify-end space-x-3 border-t pt-4">
-                      {product.status !== 'sold' && (
+                      {product.status !== 'sold' ? (
                         <>
                           {product.status === 'active' ? (
                             <button
@@ -215,6 +272,13 @@ export default function DashboardPage() {
                             Marcar Vendido
                           </button>
                         </>
+                      ) : (
+                        <button
+                            onClick={() => handleStatusChange(product.id!, 'active')}
+                            className="text-sm text-green-600 hover:text-green-900 font-medium"
+                        >
+                            Republicar (Reactivar)
+                        </button>
                       )}
                       <button
                         onClick={() => handleStatusChange(product.id!, 'deleted')}

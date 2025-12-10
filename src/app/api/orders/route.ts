@@ -40,13 +40,16 @@ export async function POST(request: Request) {
       sellerId,
       productId,
       price,
-      status: 'pending',
+      status: 'completed', // En este MVP sin pasarela de pago, la orden nace completada
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       productTitle: productData.title,
       productImage: productData.images?.[0] || null,
     };
 
     const orderRef = await adminDb.collection('orders').add(orderData);
+
+    // 5. Marcar producto como VENDIDO
+    await productRef.update({ status: 'sold' });
 
     return NextResponse.json({ orderId: orderRef.id, status: 'success' });
 

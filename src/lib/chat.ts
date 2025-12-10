@@ -31,21 +31,26 @@ export interface Message {
 export async function createOrGetChat(buyerId: string, sellerId: string, productId: string): Promise<string> {
   try {
     // 1. Buscar si ya existe el chat
-    // Nota: Firestore requiere un índice compuesto para consultas con múltiples campos.
-    // Para evitar errores de índice en este MVP, consultamos por productId y filtramos en cliente.
-    // En producción, idealmente usarías: 
-    // .where('participants', 'array-contains', buyerId) y un índice compuesto.
+    // CORRECCIÓN: Usamos 'array-contains' para cumplir con las reglas de seguridad.
+    // La regla dice: allow read: if request.auth.uid in resource.data.participants;
+    // Por lo tanto, la query DEBE incluir un filtro que garantice esto.
     
     const chatsRef = collection(db, 'chats');
-    const q = query(chatsRef, where('productId', '==', productId));
+    // Buscamos chats donde YO (buyerId) soy participante
+    const q = query(
+      chatsRef, 
+      where('participants', 'array-contains', buyerId)
+    );
+    
     const querySnapshot = await getDocs(q);
 
     let existingChatId = null;
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      // Filtramos en memoria por productId y el otro participante (sellerId)
       if (
-        data.participants.includes(buyerId) && 
+        data.productId === productId &&
         data.participants.includes(sellerId)
       ) {
         existingChatId = doc.id;

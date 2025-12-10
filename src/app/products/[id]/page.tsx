@@ -11,6 +11,8 @@ import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/constants";
+import { AvatarStack } from "@/components/ui/AvatarStack";
+import { useProductInterests } from "@/hooks/useProductInterests";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -22,6 +24,9 @@ export default function ProductDetailPage() {
   const { user } = useAuth();
   const [contacting, setContacting] = useState(false);
   const [buying, setBuying] = useState(false);
+  
+  // Hook para obtener interesados (solo útil si es el dueño, pero no hace daño llamarlo siempre si se maneja bien)
+  const { interestedUsers } = useProductInterests(product?.id || "", product?.sellerId || "");
 
   const handleBuy = async () => {
     if (!user) {
@@ -294,6 +299,16 @@ export default function ProductDetailPage() {
                         <div className="w-full bg-gray-100 text-gray-500 py-3 px-4 rounded-lg font-semibold text-center">
                           Esta es tu publicación
                         </div>
+
+                        {interestedUsers.length > 0 && (
+                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                            <p className="text-sm font-medium text-blue-900 mb-2">Personas interesadas:</p>
+                            <div className="flex justify-center">
+                                <AvatarStack users={interestedUsers} max={5} />
+                            </div>
+                          </div>
+                        )}
+
                         <Link href="/dashboard" className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 transition-colors">
                             Gestionar en Dashboard
                         </Link>
