@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 import { Product } from '@/types/product';
+import { CATEGORIES } from '@/lib/constants';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -14,10 +15,10 @@ export default function HomePage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Crear query para productos activos
+        // Crear query para productos activos y reservados
         const q = query(
           collection(db, 'products'),
-          where('status', '==', 'active')
+          where('status', 'in', ['active', 'reserved'])
         );
 
         const querySnapshot = await getDocs(q);
@@ -50,6 +51,23 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Categorías */}
+        <div className="mb-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Categorías</h2>
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {CATEGORIES.map((cat) => (
+              <Link 
+                key={cat.id} 
+                href={`/search?category=${cat.id}`}
+                className="flex-shrink-0 bg-white px-6 py-3 rounded-full shadow-sm hover:shadow-md hover:bg-blue-50 transition-all border border-gray-100 whitespace-nowrap text-gray-700 font-medium"
+              >
+                {cat.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Productos Recientes</h1>
           <Link 
@@ -70,6 +88,11 @@ export default function HomePage() {
               <Link key={product.id} href={`/products/${product.id}`} className="group">
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
                   <div className="relative h-48 w-full bg-gray-200">
+                    {product.status === 'reserved' && (
+                      <div className="absolute top-2 right-2 z-10 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                        Reservado
+                      </div>
+                    )}
                     {product.images && product.images.length > 0 ? (
                       <Image
                         src={product.images[0]}

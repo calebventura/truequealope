@@ -37,19 +37,39 @@ export const Navbar = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             <Link
-              href="/buscar"
+              href="/search"
               className="text-gray-600 hover:text-blue-600 transition-colors"
             >
               Explorar
             </Link>
-            <Link
-              href="/categorias"
-              className="text-gray-600 hover:text-blue-600 transition-colors"
-            >
-              Categorías
-            </Link>
+          </div>
+
+          {/* Search Bar (Desktop) */}
+          <div className="hidden md:block flex-1 max-w-md mx-8">
+             <form onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const input = form.elements.namedItem('q') as HTMLInputElement;
+                if (input.value.trim()) {
+                    router.push(`/search?q=${encodeURIComponent(input.value)}`);
+                }
+             }}>
+                <div className="relative">
+                  <input 
+                    name="q"
+                    type="text" 
+                    placeholder="Buscar productos..." 
+                    className="w-full pl-10 pr-4 py-1.5 rounded-full border border-gray-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+             </form>
           </div>
 
           {/* Actions */}
@@ -101,6 +121,13 @@ export const Navbar = () => {
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Mi Perfil
+                    </Link>
+                    <Link
+                      href="/dashboard"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Mis Publicaciones
                     </Link>
                     <Link
                       href="/mis-compras"

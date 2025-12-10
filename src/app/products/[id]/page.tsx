@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { CATEGORIES } from "@/lib/constants";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -194,68 +195,108 @@ export default function ProductDetailPage() {
             {/* Detalles del Producto */}
             <div className="p-8 flex flex-col">
               <div className="mb-auto">
-                <div className="flex justify-between items-start">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                    {product.condition === "like-new"
-                      ? "Como nuevo"
-                      : product.condition === "new"
-                      ? "Nuevo"
-                      : "Usado"}
-                  </span>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      {CATEGORIES.find(c => c.id === product.categoryId)?.name || 'Otro'}
+                    </span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                      {product.condition === "like-new"
+                        ? "Como nuevo"
+                        : product.condition === "new"
+                        ? "Nuevo"
+                        : "Usado"}
+                    </span>
+                    {product.status === 'reserved' && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 uppercase">
+                        Reservado
+                      </span>
+                    )}
+                    {product.status === 'sold' && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 uppercase">
+                        Vendido
+                      </span>
+                    )}
+                  </div>
                   <span className="text-sm text-gray-500">
                     {product.createdAt.toLocaleDateString()}
                   </span>
                 </div>
 
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.title}</h1>
+                <p className="text-2xl font-bold text-blue-600 mb-6">${product.price}</p>
+                
+                <div className="prose prose-sm text-gray-600 mb-8">
+                  <p>{product.description}</p>
+                </div>
+
                 <div className="mt-8 pt-8 border-t border-gray-200 flex flex-col gap-3">
                   {user?.uid !== product.sellerId ? (
                     <>
-                      <button
-                        onClick={handleBuy}
-                        disabled={buying || contacting}
-                        className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                          />
-                        </svg>
-                        {buying ? "Procesando..." : "Comprar Ahora"}
-                      </button>
-                      <button
-                        onClick={handleContact}
-                        disabled={contacting || buying}
-                        className="w-full bg-white border border-blue-600 text-blue-600 py-3 px-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                          />
-                        </svg>
-                        {contacting
-                          ? "Iniciando chat..."
-                          : "Contactar al Vendedor"}
-                      </button>
+                      {product.status === 'sold' ? (
+                         <div className="w-full bg-red-50 border border-red-200 text-red-700 py-4 px-4 rounded-lg text-center">
+                            <p className="font-semibold">Este producto ya se vendió</p>
+                            <p className="text-sm mt-1">Busca otros productos similares en el catálogo.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleBuy}
+                            disabled={buying || contacting || product.status === 'reserved'}
+                            className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                product.status === 'reserved'
+                                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    : "bg-green-600 text-white hover:bg-green-700"
+                            }`}
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                              />
+                            </svg>
+                            {buying ? "Procesando..." : product.status === 'reserved' ? "Reservado" : "Comprar Ahora"}
+                          </button>
+                          <button
+                            onClick={handleContact}
+                            disabled={contacting || buying}
+                            className="w-full bg-white border border-blue-600 text-blue-600 py-3 px-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                              />
+                            </svg>
+                            {contacting
+                              ? "Iniciando chat..."
+                              : "Contactar al Vendedor"}
+                          </button>
+                        </>
+                      )}
                     </>
                   ) : (
-                    <div className="w-full bg-gray-100 text-gray-500 py-3 px-4 rounded-lg font-semibold text-center">
-                      Esta es tu publicación
+                    <div className="flex flex-col gap-3">
+                        <div className="w-full bg-gray-100 text-gray-500 py-3 px-4 rounded-lg font-semibold text-center">
+                          Esta es tu publicación
+                        </div>
+                        <Link href="/dashboard" className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 transition-colors">
+                            Gestionar en Dashboard
+                        </Link>
                     </div>
                   )}
                 </div>

@@ -10,6 +10,7 @@ import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/storage";
 import { Product } from "@/types/product";
+import { CATEGORIES, CONDITIONS } from "@/lib/constants";
 
 // Esquema de validación con Zod
 const productSchema = z.object({
@@ -27,21 +28,6 @@ const productSchema = z.object({
 });
 
 type ProductForm = z.infer<typeof productSchema>;
-
-const CATEGORIES = [
-  { id: "electronics", name: "Electrónica" },
-  { id: "clothing", name: "Ropa y Accesorios" },
-  { id: "home", name: "Hogar y Muebles" },
-  { id: "sports", name: "Deportes" },
-  { id: "toys", name: "Juguetes" },
-  { id: "other", name: "Otros" },
-];
-
-const CONDITIONS = [
-  { id: "new", name: "Nuevo" },
-  { id: "like-new", name: "Como nuevo" },
-  { id: "used", name: "Usado" },
-];
 
 export default function NewProductPage() {
   const { user, loading: authLoading } = useAuth();

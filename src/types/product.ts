@@ -6,7 +6,7 @@ export interface Product {
   price: number;
   categoryId: string;
   images: string[];
-  status: "active" | "sold" | "paused";
+  status: "active" | "reserved" | "sold" | "deleted";
   condition: "new" | "used" | "like-new";
   location: string;
   createdAt: Date;

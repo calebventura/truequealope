@@ -1,0 +1,200 @@
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebaseClient";
+import { Product } from "@/types/product";
+import { CATEGORIES } from "@/lib/constants";
+import Link from "next/link";
+import Image from "next/image";
+
+function SearchContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const initialQuery = searchParams.get("q") || "";
+  const initialCategory = searchParams.get("category") || "";
+
+  const [searchTerm, setSearchTerm] = useState(initialQuery);
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Actualizar estado cuando cambian los params (navegación)
+  useEffect(() => {
+    setSearchTerm(searchParams.get("q") || "");
+    setSelectedCategory(searchParams.get("category") || "");
+  }, [searchParams]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (searchTerm) params.set("q", searchTerm);
+    if (selectedCategory) params.set("category", selectedCategory);
+    router.push(`/search?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        // Base query: solo productos activos
+        let constraints: any[] = [where("status", "==", "active")];
+
+        // Filtrar por categoría en Firestore si está seleccionada
+        if (selectedCategory) {
+          constraints.push(where("categoryId", "==", selectedCategory));
+        }
+
+        // Nota: Firestore requiere índices compuestos para múltiples 'where' y 'orderBy'.
+        // Por simplicidad en MVP, ordenamos por fecha si no hay conflicto, o lo hacemos en cliente.
+        // constraints.push(orderBy("createdAt", "desc")); 
+
+        const q = query(collection(db, "products"), ...constraints);
+        const querySnapshot = await getDocs(q);
+        
+        let results = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
+        })) as Product[];
+
+        // Filtrado de texto en el cliente (título o descripción)
+        if (searchTerm) {
+          const lowerTerm = searchTerm.toLowerCase();
+          results = results.filter(
+            (p) =>
+              p.title.toLowerCase().includes(lowerTerm) ||
+              p.description.toLowerCase().includes(lowerTerm)
+          );
+        }
+
+        setProducts(results);
+      } catch (error) {
+        console.error("Error buscando productos:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [searchTerm, selectedCategory]); // Re-ejecutar cuando cambian los filtros efectivos
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Explorar Productos</h1>
+
+        {/* Filtros */}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-8">
+          <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label htmlFor="search" className="sr-only">Buscar</label>
+              <input
+                type="text"
+                id="search"
+                placeholder="¿Qué estás buscando?"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="w-full md:w-64">
+              <label htmlFor="category" className="sr-only">Categoría</label>
+              <select
+                id="category"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Todas las categorías</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium"
+            >
+              Buscar
+            </button>
+          </form>
+        </div>
+
+        {/* Resultados */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron productos</h3>
+            <p className="mt-1 text-sm text-gray-500">Intenta con otros términos o categorías.</p>
+            <div className="mt-6">
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedCategory("");
+                  router.push("/search");
+                }}
+                className="text-blue-600 hover:text-blue-500 font-medium"
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <Link key={product.id} href={`/products/${product.id}`} className="group">
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
+                  <div className="relative h-48 w-full bg-gray-200">
+                    {product.images && product.images.length > 0 ? (
+                      <Image
+                        src={product.images[0]}
+                        alt={product.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400">
+                        Sin imagen
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 flex flex-col flex-grow">
+                    <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">{product.title}</h3>
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      ${product.price.toLocaleString()}
+                    </p>
+                    <div className="mt-auto pt-4 flex items-center justify-between text-sm text-gray-500">
+                      <span className="capitalize bg-gray-100 px-2 py-1 rounded text-xs">
+                        {CATEGORIES.find(c => c.id === product.categoryId)?.name || 'Otro'}
+                      </span>
+                      <span>{product.location}</span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+      <SearchContent />
+    </Suspense>
+  );
+}
