@@ -29,6 +29,15 @@ service cloud.firestore {
       
       allow update, delete: if isAuthenticated() 
                             && resource.data.sellerId == request.auth.uid;
+
+      // Registros de clic en "Contactar" (ej. WhatsApp)
+      match /contactLogs/{logId} {
+        // Cualquier usuario autenticado puede registrar un clic
+        allow create: if isAuthenticated();
+        // Solo el vendedor puede leer los registros/contadores
+        allow read: if isAuthenticated()
+                    && request.auth.uid == get(/databases/$(database)/documents/products/$(productId)).data.sellerId;
+      }
     }
 
     // Colección: chats

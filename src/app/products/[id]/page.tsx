@@ -4,15 +4,14 @@ import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
-import { createOrGetChat } from "@/lib/chat";
 import { createOrder } from "@/lib/orders";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/constants";
-import { AvatarStack } from "@/components/ui/AvatarStack";
-import { useProductInterests } from "@/hooks/useProductInterests";
+import { logContactClick, getContactClicksCount } from "@/lib/contact";
+import { UserProfile } from "@/types/user";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -24,9 +23,8 @@ export default function ProductDetailPage() {
   const { user } = useAuth();
   const [contacting, setContacting] = useState(false);
   const [buying, setBuying] = useState(false);
-  
-  // Hook para obtener interesados (solo útil si es el dueño, pero no hace daño llamarlo siempre si se maneja bien)
-  const { interestedUsers } = useProductInterests(product?.id || "", product?.sellerId || "");
+  const [sellerProfile, setSellerProfile] = useState<Partial<UserProfile> | null>(null);
+  const [contactClicks, setContactClicks] = useState<number | null>(null);
 
   const handleBuy = async () => {
     if (!user) {
@@ -42,8 +40,7 @@ export default function ProductDetailPage() {
         product.id!,
         product.price
       );
-      alert(`¡Orden creada con éxito! ID: ${orderId.orderId}`);
-      // Aquí podrías redirigir a una página de "Mis Compras" o al chat
+      alert(`Orden creada con éxito. ID: ${orderId.orderId}`);
     } catch (error: any) {
       console.error("Error al comprar:", error);
       alert(`Error al crear la orden: ${error.message}`);
@@ -59,20 +56,33 @@ export default function ProductDetailPage() {
     }
     if (!product) return;
 
+    const phone = sellerProfile?.phoneNumber;
+    if (!phone) {
+      alert("El vendedor no ha configurado su número de WhatsApp.");
+      return;
+    }
+
     setContacting(true);
     try {
-      const chatId = await createOrGetChat(
-        user.uid,
-        product.sellerId,
-        product.id!
-      );
-      router.push(`/chat/${chatId}`);
+      await logContactClick(product.id!, user.uid, "whatsapp");
+      if (user.uid === product.sellerId) {
+        // Si el vendedor prueba su propio botón, refrescamos el contador.
+        const refreshed = await getContactClicksCount(product.id!);
+        setContactClicks(refreshed);
+      }
     } catch (error) {
-      console.error("Error al contactar:", error);
-      alert("No se pudo iniciar el chat. Inténtalo de nuevo.");
+      console.error("Error registrando clic de contacto:", error);
+      // No bloqueamos la apertura de WhatsApp.
     } finally {
       setContacting(false);
     }
+
+    const normalizedPhone = phone.replace(/[^\d]/g, "");
+    const message = encodeURIComponent(
+      `Hola, vi tu publicación "${product.title}" en Reutilizalope. ¿Sigue disponible?`
+    );
+    const waUrl = `https://wa.me/${normalizedPhone}?text=${message}`;
+    window.open(waUrl, "_blank");
   };
 
   useEffect(() => {
@@ -96,11 +106,19 @@ export default function ProductDetailPage() {
           if (productData.images && productData.images.length > 0) {
             setSelectedImage(productData.images[0]);
           }
+
+          const sellerDoc = await getDoc(doc(db, "users", productData.sellerId));
+          if (sellerDoc.exists()) {
+            setSellerProfile(sellerDoc.data() as UserProfile);
+          } else {
+            setSellerProfile(null);
+          }
         } else {
-          console.log("No such document!");
+          setProduct(null);
         }
       } catch (error) {
         console.error("Error fetching product:", error);
+        setProduct(null);
       } finally {
         setLoading(false);
       }
@@ -108,6 +126,21 @@ export default function ProductDetailPage() {
 
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    const fetchContactClicks = async () => {
+      if (!product || !user || product.sellerId !== user.uid) return;
+      try {
+        const count = await getContactClicksCount(product.id!);
+        setContactClicks(count);
+      } catch (error) {
+        console.error("Error obteniendo clics de contacto:", error);
+        setContactClicks(null);
+      }
+    };
+
+    fetchContactClicks();
+  }, [product, user]);
 
   if (loading) {
     return (
@@ -129,6 +162,9 @@ export default function ProductDetailPage() {
       </div>
     );
   }
+
+  const sellerIsOwner = user?.uid === product.sellerId;
+  const contactDisabled = contacting || buying || !sellerProfile?.phoneNumber;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -203,7 +239,8 @@ export default function ProductDetailPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-2 flex-wrap">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      {CATEGORIES.find(c => c.id === product.categoryId)?.name || 'Otro'}
+                      {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
+                        "Otro"}
                     </span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
                       {product.condition === "like-new"
@@ -212,12 +249,12 @@ export default function ProductDetailPage() {
                         ? "Nuevo"
                         : "Usado"}
                     </span>
-                    {product.status === 'reserved' && (
+                    {product.status === "reserved" && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 uppercase">
                         Reservado
                       </span>
                     )}
-                    {product.status === 'sold' && (
+                    {product.status === "sold" && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 uppercase">
                         Vendido
                       </span>
@@ -228,30 +265,42 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
 
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.title}</h1>
-                <p className="text-2xl font-bold text-blue-600 mb-6">${product.price}</p>
-                
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {product.title}
+                </h1>
+                <p className="text-2xl font-bold text-blue-600 mb-6">
+                  ${product.price.toLocaleString()}
+                </p>
+
                 <div className="prose prose-sm text-gray-600 mb-8">
                   <p>{product.description}</p>
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-gray-200">
-                  {user?.uid !== product.sellerId ? (
+                  {!sellerIsOwner ? (
                     <>
-                      {product.status === 'sold' ? (
-                         <div className="w-full bg-red-50 border border-red-200 text-red-700 py-4 px-4 rounded-lg text-center">
-                            <p className="font-semibold">Este producto ya se vendió</p>
-                            <p className="text-sm mt-1">Busca otros productos similares en el catálogo.</p>
+                      {product.status === "sold" ? (
+                        <div className="w-full bg-red-50 border border-red-200 text-red-700 py-4 px-4 rounded-lg text-center">
+                          <p className="font-semibold">
+                            Este producto ya se vendió
+                          </p>
+                          <p className="text-sm mt-1">
+                            Busca otros productos similares en el catálogo.
+                          </p>
                         </div>
                       ) : (
                         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none">
                           <button
                             onClick={handleBuy}
-                            disabled={buying || contacting || product.status === 'reserved'}
+                            disabled={
+                              buying ||
+                              contacting ||
+                              product.status === "reserved"
+                            }
                             className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-                                product.status === 'reserved'
-                                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                    : "bg-green-600 text-white hover:bg-green-700"
+                              product.status === "reserved"
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : "bg-green-600 text-white hover:bg-green-700"
                             }`}
                           >
                             <svg
@@ -267,51 +316,69 @@ export default function ProductDetailPage() {
                                 d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                               />
                             </svg>
-                            {buying ? "Procesando..." : product.status === 'reserved' ? "Reservado" : "Comprar Ahora"}
+                            {buying
+                              ? "Procesando..."
+                              : product.status === "reserved"
+                              ? "Reservado"
+                              : "Comprar Ahora"}
                           </button>
-                          <button
-                            onClick={handleContact}
-                            disabled={contacting || buying}
-                            className="w-full bg-white border border-blue-600 text-blue-600 py-3 px-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={handleContact}
+                              disabled={contactDisabled}
+                              className="w-full bg-white border border-green-600 text-green-700 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                              />
-                            </svg>
-                            {contacting
-                              ? "Iniciando chat..."
-                              : "Contactar al Vendedor"}
-                          </button>
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                />
+                              </svg>
+                              {contacting
+                                ? "Abriendo WhatsApp..."
+                                : "Contactar por WhatsApp"}
+                            </button>
+                            {!sellerProfile?.phoneNumber && (
+                              <p className="text-xs text-red-600 text-center">
+                                El vendedor aún no cargó su número de WhatsApp.
+                              </p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </>
                   ) : (
                     <div className="flex flex-col gap-3">
-                        <div className="w-full bg-gray-100 text-gray-500 py-3 px-4 rounded-lg font-semibold text-center">
-                          Esta es tu publicación
-                        </div>
+                      <div className="w-full bg-gray-100 text-gray-500 py-3 px-4 rounded-lg font-semibold text-center">
+                        Esta es tu publicación
+                      </div>
 
-                        {interestedUsers.length > 0 && (
-                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                            <p className="text-sm font-medium text-blue-900 mb-2">Personas interesadas:</p>
-                            <div className="flex justify-center">
-                                <AvatarStack users={interestedUsers} max={5} />
-                            </div>
-                          </div>
-                        )}
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <p className="text-sm font-medium text-blue-900 mb-1">
+                          Clics en “Contactar” (WhatsApp)
+                        </p>
+                        <p className="text-2xl font-bold text-blue-800">
+                          {contactClicks !== null ? contactClicks : "—"}
+                        </p>
+                        <p className="text-xs text-blue-700">
+                          Se cuentan cada vez que un usuario abre el enlace de
+                          WhatsApp.
+                        </p>
+                      </div>
 
-                        <Link href="/dashboard" className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 transition-colors">
-                            Gestionar en Dashboard
-                        </Link>
+                      <Link
+                        href="/dashboard"
+                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 transition-colors"
+                      >
+                        Gestionar en Dashboard
+                      </Link>
                     </div>
                   )}
                 </div>

@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Order } from "@/types/order";
 import Link from "next/link";
 import Image from "next/image";
-import { createOrGetChat } from "@/lib/chat";
-import { useRouter } from "next/navigation";
+import { logContactClick } from "@/lib/contact";
 
 export default function MyPurchasesPage() {
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const [sellerContacts, setSellerContacts] = useState<
+    Record<string, { phoneNumber?: string | null; name?: string | null }>
+  >({});
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -44,6 +52,29 @@ export default function MyPurchasesPage() {
         });
 
         setOrders(ordersData);
+
+        const sellerIds = Array.from(new Set(ordersData.map((o) => o.sellerId)));
+        const contactEntries = await Promise.all(
+          sellerIds.map(async (sellerId) => {
+            try {
+              const sellerSnap = await getDoc(doc(db, "users", sellerId));
+              if (sellerSnap.exists()) {
+                const data = sellerSnap.data();
+                return [
+                  sellerId,
+                  {
+                    phoneNumber: data.phoneNumber,
+                    name: data.displayName || data.email,
+                  },
+                ] as const;
+              }
+            } catch (error) {
+              console.error("Error fetching seller contact:", error);
+            }
+            return [sellerId, { phoneNumber: null, name: null }] as const;
+          })
+        );
+        setSellerContacts(Object.fromEntries(contactEntries));
       } catch (error) {
         console.error("Error fetching orders:", error);
       } finally {
@@ -56,15 +87,30 @@ export default function MyPurchasesPage() {
     }
   }, [user, authLoading]);
 
-  const handleContactSeller = async (sellerId: string, productId: string) => {
+  const handleContactSeller = async (order: Order) => {
     if (!user) return;
-    try {
-      const chatId = await createOrGetChat(user.uid, sellerId, productId);
-      router.push(`/chat/${chatId}`);
-    } catch (error) {
-      console.error("Error opening chat:", error);
-      alert("No se pudo abrir el chat");
+
+    const sellerContact = sellerContacts[order.sellerId];
+    const phone = sellerContact?.phoneNumber;
+
+    if (!phone) {
+      alert("El vendedor no ha configurado su número de WhatsApp.");
+      return;
     }
+
+    try {
+      await logContactClick(order.productId, user.uid, "whatsapp");
+    } catch (error) {
+      console.error("Error registrando clic de contacto:", error);
+      // Continuamos para no bloquear la apertura de WhatsApp
+    }
+
+    const normalizedPhone = phone.replace(/[^\d]/g, "");
+    const message = encodeURIComponent(
+      `Hola, vi tu producto "${order.productTitle}" en Reutilizalope. ¿Sigue disponible?`
+    );
+    const waUrl = `https://wa.me/${normalizedPhone}?text=${message}`;
+    window.open(waUrl, "_blank");
   };
 
   if (authLoading) return <div className="p-8 text-center">Cargando...</div>;
@@ -156,9 +202,7 @@ export default function MyPurchasesPage() {
 
                   <div className="mt-4 flex gap-3">
                     <button
-                      onClick={() =>
-                        handleContactSeller(order.sellerId, order.productId)
-                      }
+                      onClick={() => handleContactSeller(order)}
                       className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       Contactar Vendedor
