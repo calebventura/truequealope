@@ -15,7 +15,7 @@ service cloud.firestore {
     // Colección: users
     // Perfiles públicos de lectura, pero solo el dueño puede editar su info.
     match /users/{userId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isOwner(userId);
     }
 
@@ -23,11 +23,11 @@ service cloud.firestore {
     // Lectura pública. Escritura solo para usuarios autenticados y dueños del producto.
     match /products/{productId} {
       allow read: if true;
-      
-      allow create: if isAuthenticated() 
+
+      allow create: if isAuthenticated()
                     && request.resource.data.sellerId == request.auth.uid;
-      
-      allow update, delete: if isAuthenticated() 
+
+      allow update, delete: if isAuthenticated()
                             && resource.data.sellerId == request.auth.uid;
 
       // Registros de clic en "Contactar" (ej. WhatsApp)
@@ -35,10 +35,14 @@ service cloud.firestore {
         // Cualquier usuario autenticado puede registrar un clic
         allow create: if isAuthenticated()
                       && request.resource.data.userId == request.auth.uid
-                      && request.resource.data.sellerId == get(/databases/$(database)/documents/products/$(productId)).data.sellerId
+                      && request.resource.data.sellerId
+                        == get(/databases/$(database)/documents/products/$(productId)).data.sellerId
                       && request.resource.data.channel in ["whatsapp", "other"]
-                      && request.resource.data.keys().hasOnly(["userId", "sellerId", "channel", "createdAt"]);
-        // El vendedor puede ver métricas; el comprador solo puede leer sus propios logs
+                      && request.resource.data.keys()
+                        .hasOnly(["userId", "sellerId", "channel", "createdAt"]);
+
+        // El vendedor puede ver métricas; el comprador solo puede leer sus propios logs.
+        // Nota: evitamos get() aquí para que collectionGroup('contactLogs') funcione sin límites de get/exists.
         allow read: if isAuthenticated()
                     && (
                       request.auth.uid == resource.data.userId
@@ -59,22 +63,15 @@ service cloud.firestore {
     }
 
     // Colección: chats
-    // Solo los participantes pueden leer o escribir en el chat.
+    // Chat interno DESACTIVADO en este MVP (se usa WhatsApp).
     match /chats/{chatId} {
-      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
-      
-      allow create: if isAuthenticated() 
-                    && request.resource.data.participants.hasAll([request.auth.uid])
-                    && request.resource.data.participants.size() == 2;
+      allow read, write: if false;
 
-      // Subcolección: messages
-      // Hereda permisos verificando los participantes del documento padre (chat).
       match /messages/{messageId} {
-        allow read, write: if isAuthenticated() 
-                           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow read, write: if false;
       }
     }
-    
+
     // Colección: categories
     // Solo lectura pública. Escritura restringida (admin).
     match /categories/{categoryId} {

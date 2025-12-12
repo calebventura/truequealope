@@ -25,6 +25,8 @@ export default function ProductDetailPage() {
   const [buying, setBuying] = useState(false);
   const [sellerProfile, setSellerProfile] =
     useState<Partial<UserProfile> | null>(null);
+  const [sellerLoading, setSellerLoading] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [contactClicks, setContactClicks] = useState<number | null>(null);
 
   const openWhatsApp = async (messageText: string) => {
@@ -34,7 +36,23 @@ export default function ProductDetailPage() {
     }
     if (!product) return;
 
-    const phone = sellerProfile?.phoneNumber;
+    let fetchedPhone: string | null | undefined;
+    if (!sellerProfile?.phoneNumber) {
+      try {
+        const sellerDoc = await getDoc(doc(db, "users", product.sellerId));
+        const sellerData = sellerDoc.exists()
+          ? (sellerDoc.data() as UserProfile)
+          : null;
+        if (sellerData) {
+          setSellerProfile(sellerData);
+          fetchedPhone = sellerData.phoneNumber ?? null;
+        }
+      } catch (error) {
+        console.error("Error fetching seller profile:", error);
+      }
+    }
+
+    const phone = sellerProfile?.phoneNumber ?? fetchedPhone;
     if (!phone) {
       alert("El vendedor no ha configurado su número de WhatsApp.");
       return;
@@ -90,17 +108,41 @@ export default function ProductDetailPage() {
 
     setBuying(true);
     try {
-      const orderId = await createOrder(
-        product.sellerId,
-        product.id!,
-        product.price
-      );
+      const orderId = await createOrder(product.id!);
       alert(`Orden creada con éxito. ID: ${orderId.orderId}`);
     } catch (error) {
       console.error("Error al comprar:", error);
       alert(`Error al crear la orden: ${(error as Error).message}`);
     } finally {
       setBuying(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+
+    const url = window.location.href;
+    const title = product.title;
+    const text = `Mira este producto en Reutilizalope: ${title}`;
+
+    setSharing(true);
+    try {
+      if ("share" in navigator && typeof navigator.share === "function") {
+        await navigator.share({ title, text, url });
+        return;
+      }
+
+      if ("clipboard" in navigator && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        alert("Link copiado.");
+        return;
+      }
+
+      window.prompt("Copia este enlace:", url);
+    } catch (error) {
+      console.error("Error sharing:", error);
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -127,10 +169,8 @@ export default function ProductDetailPage() {
             setSelectedImage(productData.images[0]);
           }
 
-          const sellerDoc = await getDoc(doc(db, "users", productData.sellerId));
-          setSellerProfile(
-            sellerDoc.exists() ? (sellerDoc.data() as UserProfile) : null
-          );
+          setSellerProfile(null);
+          setSellerLoading(false);
         } else {
           setProduct(null);
         }
@@ -144,6 +184,33 @@ export default function ProductDetailPage() {
 
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    const fetchSellerProfile = async () => {
+      if (!product) return;
+
+      if (!user) {
+        setSellerProfile(null);
+        setSellerLoading(false);
+        return;
+      }
+
+      setSellerLoading(true);
+      try {
+        const sellerDoc = await getDoc(doc(db, "users", product.sellerId));
+        setSellerProfile(
+          sellerDoc.exists() ? (sellerDoc.data() as UserProfile) : null
+        );
+      } catch (error) {
+        console.error("Error fetching seller profile:", error);
+        setSellerProfile(null);
+      } finally {
+        setSellerLoading(false);
+      }
+    };
+
+    void fetchSellerProfile();
+  }, [product, user]);
 
   useEffect(() => {
     const fetchContactClicks = async () => {
@@ -186,7 +253,9 @@ export default function ProductDetailPage() {
   const canTrade = mode === "trade" || mode === "both";
   const sellerIsOwner = user?.uid === product.sellerId;
   const whatsappDisabled =
-    contacting || buying || !sellerProfile?.phoneNumber;
+    contacting ||
+    buying ||
+    (user ? sellerLoading || !sellerProfile?.phoneNumber : false);
   const buyDisabled =
     buying ||
     contacting ||
@@ -203,25 +272,50 @@ export default function ProductDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center text-gray-600 hover:text-gray-900"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-          Volver al listado
-        </Link>
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Volver al listado
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={sharing}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              className="h-5 w-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18 8a3 3 0 1 0-2.816-4H15a3 3 0 0 0 .184 1.02L8.91 8.49a3 3 0 0 0-1.91-.69 3 3 0 1 0 2.816 4H10a3 3 0 0 0-.184-1.02l6.274-3.47A3 3 0 0 0 18 8Zm-11 7a3 3 0 0 0 1.91-.69l6.274 3.47A3 3 0 0 0 15 19h.184A3 3 0 1 0 18 16a3 3 0 0 0-1.91.69l-6.274-3.47A3 3 0 0 0 10 12H9.816A3 3 0 0 0 7 15Z"
+              />
+            </svg>
+            {sharing ? "Compartiendo..." : "Compartir"}
+          </button>
+        </div>
 
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
@@ -437,7 +531,7 @@ export default function ProductDetailPage() {
                             </button>
                           )}
 
-                          {!sellerProfile?.phoneNumber && (
+                          {user && !sellerLoading && !sellerProfile?.phoneNumber && (
                             <p className="text-xs text-red-600 text-center">
                               El vendedor aún no cargó su número de WhatsApp.
                             </p>

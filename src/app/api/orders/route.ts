@@ -1,60 +1,101 @@
-import { NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
-import * as admin from 'firebase-admin';
+import { NextResponse } from "next/server";
+import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import * as admin from "firebase-admin";
+
+type HttpError = Error & { status?: number };
+
+function httpError(message: string, status: number): HttpError {
+  const err = new Error(message) as HttpError;
+  err.status = status;
+  return err;
+}
 
 export async function POST(request: Request) {
   try {
-    // 1. Validar autenticación (Bearer Token)
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const idToken = authHeader.split('Bearer ')[1];
+    const idToken = authHeader.split("Bearer ")[1];
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const buyerId = decodedToken.uid;
 
-    // 2. Obtener datos del body
-    const { sellerId, productId, price } = await request.json();
+    const body = (await request.json().catch(() => null)) as
+      | { productId?: unknown; sellerId?: unknown; price?: unknown }
+      | null;
 
-    if (!sellerId || !productId || !price) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    const productId = body?.productId;
+    if (typeof productId !== "string" || !productId) {
+      return NextResponse.json({ error: "Missing productId" }, { status: 400 });
     }
 
-    // 3. Validar estado del producto
-    const productRef = adminDb.collection('products').doc(productId);
-    const productSnap = await productRef.get();
+    const productRef = adminDb.collection("products").doc(productId);
+    const ordersRef = adminDb.collection("orders");
 
-    if (!productSnap.exists) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
+    const orderId = await adminDb.runTransaction(async (tx) => {
+      const productSnap = await tx.get(productRef);
+      if (!productSnap.exists) throw httpError("Product not found", 404);
 
-    const productData = productSnap.data();
-    if (productData?.status !== 'active') {
-      return NextResponse.json({ error: 'Product is not active' }, { status: 400 });
-    }
+      const productData = productSnap.data() as Record<string, unknown>;
+      if (productData.status !== "active") {
+        throw httpError("Product is not active", 400);
+      }
 
-    // 4. Crear la orden
-    const orderData = {
-      buyerId,
-      sellerId,
-      productId,
-      price,
-      status: 'completed', // En este MVP sin pasarela de pago, la orden nace completada
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      productTitle: productData.title,
-      productImage: productData.images?.[0] || null,
-    };
+      const sellerId = productData.sellerId;
+      if (typeof sellerId !== "string" || !sellerId) {
+        throw httpError("Invalid product seller", 400);
+      }
 
-    const orderRef = await adminDb.collection('orders').add(orderData);
+      if (sellerId === buyerId) {
+        throw httpError("Cannot buy your own product", 400);
+      }
 
-    // 5. Marcar producto como VENDIDO
-    await productRef.update({ status: 'sold' });
+      const mode =
+        typeof productData.mode === "string" ? productData.mode : "sale";
+      if (mode === "trade") {
+        throw httpError("Product is not for sale", 400);
+      }
 
-    return NextResponse.json({ orderId: orderRef.id, status: 'success' });
+      const price = productData.price;
+      if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) {
+        throw httpError("Invalid product price", 400);
+      }
 
+      const images = Array.isArray(productData.images)
+        ? (productData.images as unknown[])
+        : [];
+
+      const orderRef = ordersRef.doc();
+      tx.set(orderRef, {
+        buyerId,
+        sellerId,
+        productId,
+        price,
+        status: "completed",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        productTitle:
+          typeof productData.title === "string" ? productData.title : "",
+        productImage: typeof images[0] === "string" ? images[0] : null,
+      });
+
+      tx.update(productRef, { status: "sold" });
+
+      return orderRef.id;
+    });
+
+    return NextResponse.json({ orderId, status: "success" });
   } catch (error) {
-    console.error('Error creating order:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    const status = (error as HttpError).status;
+    if (typeof status === "number") {
+      return NextResponse.json({ error: (error as Error).message }, { status });
+    }
+
+    console.error("Error creating order:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
+

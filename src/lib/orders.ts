@@ -1,6 +1,6 @@
 import { auth } from '@/lib/firebaseClient';
 
-export async function createOrder(sellerId: string, productId: string, price: number) {
+export async function createOrder(productId: string) {
   const user = auth.currentUser;
   if (!user) throw new Error("User not authenticated");
 
@@ -14,9 +14,7 @@ export async function createOrder(sellerId: string, productId: string, price: nu
       'Authorization': `Bearer ${idToken}`
     },
     body: JSON.stringify({
-      sellerId,
       productId,
-      price
     })
   });
 
