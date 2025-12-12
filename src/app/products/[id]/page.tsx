@@ -80,7 +80,7 @@ export default function ProductDetailPage() {
 
   const handleContactSale = () => {
     if (!product) return;
-    const message = `Hola, vi tu publicación "${product.title}" en Reutilizalope. ¿Sigue disponible?`;
+    const message = `Hola, vi tu publicación "${product.title}" en Truequéalope. ¿Sigue disponible?`;
     openWhatsApp(message);
   };
 
@@ -123,7 +123,7 @@ export default function ProductDetailPage() {
 
     const url = window.location.href;
     const title = product.title;
-    const text = `Mira este producto en Reutilizalope: ${title}`;
+    const text = `Mira este producto en Truequéalope: ${title}`;
 
     setSharing(true);
     try {

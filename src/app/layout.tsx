@@ -19,7 +19,7 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Reutilizalope - Compra y Vende",
+  title: "Truequéalope - Compra y Vende",
   description: "El mejor marketplace de cosas usadas",
 };
 

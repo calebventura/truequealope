@@ -28,7 +28,7 @@ export const Navbar = () => {
         <div className="flex flex-wrap md:flex-nowrap items-center justify-between py-3 md:h-16 gap-4 md:gap-0">
           {/* Logo - Order 1 on mobile */}
           <Link href="/" className="text-xl font-bold text-indigo-600 order-1">
-            ReutilizaLope
+            Truequéalope
           </Link>
 
           {/* Search Bar - Order 3 on mobile (new row), Order 2 on desktop */}

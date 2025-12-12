@@ -34,7 +34,7 @@ export async function generateMetadata({
   params,
 }: ProductRouteProps): Promise<Metadata> {
   const { id } = await params;
-  const siteName = "Reutilizalope";
+  const siteName = "Truequéalope";
   const canonicalPath = `/products/${id}`;
 
   try {
@@ -49,7 +49,7 @@ export async function generateMetadata({
     const data = snap.data() ?? {};
     const title = coerceString(data.title) ?? "Producto";
     const descriptionRaw =
-      coerceString(data.description) ?? "Ver producto en Reutilizalope.";
+      coerceString(data.description) ?? "Ver producto en Truequéalope.";
     const description = truncate(descriptionRaw, 160);
     const images = coerceImages(data.images);
     const imageUrl = images[0] ?? null;
@@ -95,7 +95,7 @@ export async function generateMetadata({
     console.error("generateMetadata failed:", error);
     return {
       title: `Producto | ${siteName}`,
-      description: "Ver producto en Reutilizalope.",
+      description: "Ver producto en Truequéalope.",
       alternates: { canonical: canonicalPath },
     };
   }
