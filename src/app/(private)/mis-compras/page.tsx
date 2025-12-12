@@ -99,7 +99,7 @@ export default function MyPurchasesPage() {
     }
 
     try {
-      await logContactClick(order.productId, user.uid, "whatsapp");
+        await logContactClick(order.productId, user.uid, order.sellerId, "whatsapp");
     } catch (error) {
       console.error("Error registrando clic de contacto:", error);
       // Continuamos para no bloquear la apertura de WhatsApp

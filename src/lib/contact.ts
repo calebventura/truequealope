@@ -13,11 +13,13 @@ import { db } from "@/lib/firebaseClient";
 export async function logContactClick(
   productId: string,
   userId: string,
+  sellerId: string,
   channel: "whatsapp" | "other" = "whatsapp",
 ) {
   const productRef = doc(db, "products", productId);
   await addDoc(collection(productRef, "contactLogs"), {
     userId,
+    sellerId,
     channel,
     createdAt: serverTimestamp(),
   });

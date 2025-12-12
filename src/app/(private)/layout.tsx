@@ -14,7 +14,10 @@ export default function PrivateLayout({
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/auth/login");
+      const next = encodeURIComponent(
+        `${window.location.pathname}${window.location.search}`
+      );
+      router.replace(`/auth/login?next=${next}`);
     }
   }, [user, loading, router]);
 

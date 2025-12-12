@@ -116,7 +116,7 @@ export const Navbar = () => {
                   </div>
 
                   <Link
-                    href="/dashboard"
+                    href="/activity?tab=seller"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -137,7 +137,7 @@ export const Navbar = () => {
                     Mi perfil
                   </Link>
                   <Link
-                    href="/mis-compras"
+                    href="/activity?tab=buyer"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -177,4 +177,3 @@ export const Navbar = () => {
     </nav>
   );
 };
-

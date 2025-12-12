@@ -185,7 +185,7 @@ export default function NewProductPage() {
       });
 
       localStorage.removeItem(DRAFT_KEY);
-      router.push("/dashboard");
+      router.push("/activity?tab=seller");
     } catch (error) {
       console.error("Error al publicar:", error);
       setGeneralError("Ocurrió un error al publicar el producto. Inténtalo de nuevo.");

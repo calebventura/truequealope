@@ -1,11 +1,11 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,9 @@ const registerSchema = z
   .object({
     name: z.string().min(2, "El nombre es muy corto"),
     email: z.string().email("Email inválido"),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres"),
     confirmPassword: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -26,7 +28,7 @@ const registerSchema = z
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
-export default function RegisterPage() {
+function RegisterContent() {
   const [error, setError] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -185,3 +187,18 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Cargando...
+        </div>
+      }
+    >
+      <RegisterContent />
+    </Suspense>
+  );
+}
+

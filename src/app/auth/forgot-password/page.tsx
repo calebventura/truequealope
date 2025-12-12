@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import Link from "next/link";
@@ -16,11 +16,12 @@ const forgotPasswordSchema = z.object({
 
 type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next") || "/";
   const nextPath = nextParam.startsWith("/") ? nextParam : "/";
@@ -120,3 +121,14 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}
+    >
+      <ForgotPasswordContent />
+    </Suspense>
+  );
+}
+

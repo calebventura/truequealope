@@ -33,11 +33,29 @@ service cloud.firestore {
       // Registros de clic en "Contactar" (ej. WhatsApp)
       match /contactLogs/{logId} {
         // Cualquier usuario autenticado puede registrar un clic
-        allow create: if isAuthenticated();
-        // Solo el vendedor puede leer los registros/contadores
+        allow create: if isAuthenticated()
+                      && request.resource.data.userId == request.auth.uid
+                      && request.resource.data.sellerId == get(/databases/$(database)/documents/products/$(productId)).data.sellerId
+                      && request.resource.data.channel in ["whatsapp", "other"]
+                      && request.resource.data.keys().hasOnly(["userId", "sellerId", "channel", "createdAt"]);
+        // El vendedor puede ver métricas; el comprador solo puede leer sus propios logs
         allow read: if isAuthenticated()
-                    && request.auth.uid == get(/databases/$(database)/documents/products/$(productId)).data.sellerId;
+                    && (
+                      request.auth.uid == resource.data.userId
+                      || request.auth.uid == resource.data.sellerId
+                    );
       }
+    }
+
+    // Colección: orders
+    // Solo lectura para comprador o vendedor. Escritura desde backend (Admin SDK).
+    match /orders/{orderId} {
+      allow read: if isAuthenticated()
+                  && (
+                    request.auth.uid == resource.data.buyerId
+                    || request.auth.uid == resource.data.sellerId
+                  );
+      allow write: if false;
     }
 
     // Colección: chats

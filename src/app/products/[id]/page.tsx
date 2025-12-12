@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
-import { Product } from "@/types/product";
+import { Product, ProductMode } from "@/types/product";
 import { createOrder } from "@/lib/orders";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useParams } from "next/navigation";
@@ -23,14 +23,62 @@ export default function ProductDetailPage() {
   const { user } = useAuth();
   const [contacting, setContacting] = useState(false);
   const [buying, setBuying] = useState(false);
-  const [sellerProfile, setSellerProfile] = useState<Partial<UserProfile> | null>(
-    null
-  );
+  const [sellerProfile, setSellerProfile] =
+    useState<Partial<UserProfile> | null>(null);
   const [contactClicks, setContactClicks] = useState<number | null>(null);
+
+  const openWhatsApp = async (messageText: string) => {
+    if (!user) {
+      router.push(`/auth/login?next=/products/${id}`);
+      return;
+    }
+    if (!product) return;
+
+    const phone = sellerProfile?.phoneNumber;
+    if (!phone) {
+      alert("El vendedor no ha configurado su número de WhatsApp.");
+      return;
+    }
+
+    setContacting(true);
+    try {
+      await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
+      if (user.uid === product.sellerId) {
+        const refreshed = await getContactClicksCount(product.id!);
+        setContactClicks(refreshed);
+      }
+    } catch (error) {
+      console.error("Error registrando clic de contacto:", error);
+    } finally {
+      setContacting(false);
+    }
+
+    const normalizedPhone = phone.replace(/[^\d]/g, "");
+    const waUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(
+      messageText
+    )}`;
+    window.open(waUrl, "_blank");
+  };
+
+  const handleContactSale = () => {
+    if (!product) return;
+    const message = `Hola, vi tu publicación "${product.title}" en Reutilizalope. ¿Sigue disponible?`;
+    openWhatsApp(message);
+  };
+
+  const handleOfferTrade = () => {
+    if (!product) return;
+    const wantedList =
+      product.wanted && product.wanted.length > 0
+        ? product.wanted.join(", ")
+        : "lo que buscas";
+    const message = `Hola, me interesa tu publicación "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. ¿Te interesa?`;
+    openWhatsApp(message);
+  };
 
   const handleBuy = async () => {
     if (!user) {
-      router.push("/auth/login");
+      router.push(`/auth/login?next=/products/${id}`);
       return;
     }
     if (!product) return;
@@ -54,40 +102,6 @@ export default function ProductDetailPage() {
     } finally {
       setBuying(false);
     }
-  };
-
-  const handleContact = async () => {
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
-    if (!product) return;
-
-    const phone = sellerProfile?.phoneNumber;
-    if (!phone) {
-      alert("El vendedor no ha configurado su número de WhatsApp.");
-      return;
-    }
-
-    setContacting(true);
-    try {
-      await logContactClick(product.id!, user.uid, "whatsapp");
-      if (user.uid === product.sellerId) {
-        const refreshed = await getContactClicksCount(product.id!);
-        setContactClicks(refreshed);
-      }
-    } catch (error) {
-      console.error("Error registrando clic de contacto:", error);
-    } finally {
-      setContacting(false);
-    }
-
-    const normalizedPhone = phone.replace(/[^\d]/g, "");
-    const message = encodeURIComponent(
-      `Hola, vi tu publicación "${product.title}" en Reutilizalope. ¿Sigue disponible?`
-    );
-    const waUrl = `https://wa.me/${normalizedPhone}?text=${message}`;
-    window.open(waUrl, "_blank");
   };
 
   useEffect(() => {
@@ -167,10 +181,24 @@ export default function ProductDetailPage() {
     );
   }
 
+  const mode: ProductMode = product.mode ?? "sale";
+  const canSell = mode === "sale" || mode === "both";
+  const canTrade = mode === "trade" || mode === "both";
   const sellerIsOwner = user?.uid === product.sellerId;
-  const contactDisabled = contacting || buying || !sellerProfile?.phoneNumber;
+  const whatsappDisabled =
+    contacting || buying || !sellerProfile?.phoneNumber;
   const buyDisabled =
-    buying || contacting || product.status === "reserved" || product.price == null;
+    buying ||
+    contacting ||
+    product.status === "reserved" ||
+    product.price == null;
+
+  const wantedItems = product.wanted ?? [];
+  const wantedPreview =
+    wantedItems.length > 0 ? wantedItems.join(", ") : null;
+
+  const modeBadge =
+    mode === "trade" ? "Trueque" : mode === "both" ? "Venta / Trueque" : null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -244,6 +272,11 @@ export default function ProductDetailPage() {
               <div className="mb-auto">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-2 flex-wrap">
+                    {modeBadge && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 uppercase">
+                        {modeBadge}
+                      </span>
+                    )}
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                       {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
                         "Otro"}
@@ -274,14 +307,37 @@ export default function ProductDetailPage() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {product.title}
                 </h1>
-                <p className="text-2xl font-bold text-blue-600 mb-6">
-                  {product.price != null
-                    ? `$${product.price.toLocaleString()}`
-                    : "Sin precio"}
-                </p>
+
+                {canSell && product.price != null ? (
+                  <p className="text-2xl font-bold text-blue-600 mb-2">
+                    ${product.price.toLocaleString()}
+                  </p>
+                ) : (
+                  <p className="text-sm font-semibold text-gray-700 mb-2">
+                    {canTrade ? "Solo trueque" : "Sin precio"}
+                  </p>
+                )}
+
+                {canTrade && wantedPreview && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-gray-800">
+                      Busco a cambio:
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {wantedItems.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="prose prose-sm text-gray-600 mb-8">
-                  <p>{product.description}</p>
+                  <p>{product.description || "Sin descripción."}</p>
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-gray-200">
@@ -298,40 +354,43 @@ export default function ProductDetailPage() {
                         </div>
                       ) : (
                         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none">
-                          <button
-                            onClick={handleBuy}
-                            disabled={buyDisabled}
-                            className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-                              buyDisabled
-                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                : "bg-green-600 text-white hover:bg-green-700"
-                            }`}
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                              />
-                            </svg>
-                            {buying
-                              ? "Procesando..."
-                              : product.price == null
-                              ? "Sin precio"
-                              : product.status === "reserved"
-                              ? "Reservado"
-                              : "Comprar ahora"}
-                          </button>
-                          <div className="flex flex-col gap-2">
+                          {canSell && (
                             <button
-                              onClick={handleContact}
-                              disabled={contactDisabled}
+                              onClick={handleBuy}
+                              disabled={buyDisabled}
+                              className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                buyDisabled
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-green-600 text-white hover:bg-green-700"
+                              }`}
+                            >
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                                />
+                              </svg>
+                              {buying
+                                ? "Procesando..."
+                                : buyDisabled && product.price == null
+                                ? "Sin precio"
+                                : product.status === "reserved"
+                                ? "Reservado"
+                                : "Comprar ahora"}
+                            </button>
+                          )}
+
+                          {canSell && !canTrade && (
+                            <button
+                              onClick={handleContactSale}
+                              disabled={whatsappDisabled}
                               className="w-full bg-white border border-green-600 text-green-700 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                               <svg
@@ -351,12 +410,38 @@ export default function ProductDetailPage() {
                                 ? "Abriendo WhatsApp..."
                                 : "Contactar por WhatsApp"}
                             </button>
-                            {!sellerProfile?.phoneNumber && (
-                              <p className="text-xs text-red-600 text-center">
-                                El vendedor aún no cargó su número de WhatsApp.
-                              </p>
-                            )}
-                          </div>
+                          )}
+
+                          {canTrade && (
+                            <button
+                              onClick={handleOfferTrade}
+                              disabled={whatsappDisabled}
+                              className="w-full bg-white border border-indigo-600 text-indigo-700 py-3 px-4 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 7h6m0 0V3m0 4L3 6m17 11h-6m0 0v4m0-4l7 1"
+                                />
+                              </svg>
+                              {contacting
+                                ? "Abriendo WhatsApp..."
+                                : "Ofrecer trueque por WhatsApp"}
+                            </button>
+                          )}
+
+                          {!sellerProfile?.phoneNumber && (
+                            <p className="text-xs text-red-600 text-center">
+                              El vendedor aún no cargó su número de WhatsApp.
+                            </p>
+                          )}
                         </div>
                       )}
                     </>
@@ -380,7 +465,7 @@ export default function ProductDetailPage() {
                       </div>
 
                       <Link
-                        href="/dashboard"
+                        href="/activity?tab=seller"
                         className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 transition-colors"
                       >
                         Gestionar en Dashboard
