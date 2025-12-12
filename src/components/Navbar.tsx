@@ -27,8 +27,19 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap md:flex-nowrap items-center justify-between py-3 md:h-16 gap-4 md:gap-0">
           {/* Logo - Order 1 on mobile */}
-          <Link href="/" className="text-xl font-bold text-indigo-600 order-1">
-            Truequéalope
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-bold text-indigo-600 order-1"
+          >
+            <Image
+              src="/logo_truequealope.svg"
+              alt=""
+              aria-hidden="true"
+              width={28}
+              height={28}
+              className="h-7 w-7 shrink-0"
+            />
+            <span className="leading-none">Truequéalope</span>
           </Link>
 
           {/* Search Bar - Order 3 on mobile (new row), Order 2 on desktop */}

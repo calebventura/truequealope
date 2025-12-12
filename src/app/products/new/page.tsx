@@ -295,7 +295,7 @@ export default function NewProductPage() {
             {(mode === "sale" || mode === "both") && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Precio ($)
+                  Precio (S/.)
                 </label>
                 <input
                   type="number"

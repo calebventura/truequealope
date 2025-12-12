@@ -1,0 +1,29 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  fill="none"
+  aria-hidden="true"
+>
+  <path
+    d="M18 22c-6 0-12 4-12 10s6 10 12 10c5 0 9-3 14-10c5-7 9-10 14-10c6 0 12 4 12 10s-6 10-12 10c-5 0-9-3-14-10c-5-7-9-10-14-10Z"
+    stroke="#4F46E5"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M22 16l-6 6l6 6"
+    stroke="#4F46E5"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M42 48l6-6l-6-6"
+    stroke="#4F46E5"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
+

@@ -21,6 +21,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Truequéalope - Compra y Vende",
   description: "El mejor marketplace de cosas usadas",
+  icons: {
+    icon: [
+      { url: "/logo_truequealope.svg", type: "image/svg+xml" },
+      { url: "/icon_truequealope.ico", type: "image/x-icon" },
+    ],
+    shortcut: ["/icon_truequealope.ico"],
+  },
 };
 
 export default function RootLayout({
