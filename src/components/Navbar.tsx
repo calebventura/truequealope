@@ -1,7 +1,6 @@
-'use client';
+"use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
@@ -34,14 +33,17 @@ export const Navbar = () => {
 
           {/* Search Bar - Order 3 on mobile (new row), Order 2 on desktop */}
           <div className="w-full order-3 md:order-2 md:flex-1 md:max-w-md md:mx-8">
-             <form onSubmit={(e) => {
+            <form
+              onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
-                const input = form.elements.namedItem('q') as HTMLInputElement;
+                const input = form.elements.namedItem("q") as HTMLInputElement;
                 if (input.value.trim()) {
-                    router.push(`/search?q=${encodeURIComponent(input.value)}`);
+                  router.push(`/search?q=${encodeURIComponent(input.value)}`);
                 }
-             }} className="relative">
+              }}
+              className="relative"
+            >
               <input
                 name="q"
                 type="text"
@@ -49,8 +51,18 @@ export const Navbar = () => {
                 className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  className="h-5 w-5 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
               </div>
             </form>
@@ -59,10 +71,10 @@ export const Navbar = () => {
           {/* User Menu - Order 2 on mobile, Order 3 on desktop */}
           <div className="flex items-center gap-4 order-2 md:order-3">
             {loading ? (
-               <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+              <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
             ) : user ? (
               <div className="relative group">
-                <button 
+                <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                   className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
                 >
@@ -76,55 +88,70 @@ export const Navbar = () => {
                     />
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                      {user.displayName ? user.displayName[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : 'U')}
+                      {user.displayName
+                        ? user.displayName[0].toUpperCase()
+                        : user.email
+                        ? user.email[0].toUpperCase()
+                        : "U"}
                     </div>
                   )}
-                  <span className="hidden sm:inline">{user.displayName || user.email}</span>
+                  <span className="hidden sm:inline">
+                    {user.displayName || user.email}
+                  </span>
                 </button>
+
                 {/* Dropdown */}
-                <div className={`absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 border ${isMenuOpen ? 'block' : 'hidden'} md:group-hover:block`}>
+                <div
+                  className={`absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 border ${
+                    isMenuOpen ? "block" : "hidden"
+                  } md:group-hover:block`}
+                >
                   <div className="px-4 py-2 border-b border-gray-100 md:hidden">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {user.displayName || "Usuario"}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user.displayName || "Usuario"}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {user.email}
+                    </p>
                   </div>
+
                   <Link
                     href="/dashboard"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Mis Productos
+                    Mis productos
                   </Link>
                   <Link
                     href="/products/new"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Vender Producto
+                    Publicar producto
                   </Link>
                   <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Mi Perfil
-                    </Link>
-                    <Link
-                      href="/mis-compras"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Mis Compras
-                    </Link>
+                    href="/profile"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Mi perfil
+                  </Link>
+                  <Link
+                    href="/mis-compras"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Mis compras
+                  </Link>
+
                   <button
                     onClick={() => {
-                        setIsMenuOpen(false);
-                        handleLogout();
-                      }}
+                      setIsMenuOpen(false);
+                      handleLogout();
+                    }}
                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                   >
-                    Cerrar Sesión
+                    Cerrar sesión
                   </button>
                 </div>
               </div>
@@ -140,7 +167,7 @@ export const Navbar = () => {
                   href="/auth/register"
                   className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base"
                 >
-                  Registro
+                  Registrarse
                 </Link>
               </div>
             )}
@@ -150,3 +177,4 @@ export const Navbar = () => {
     </nav>
   );
 };
+

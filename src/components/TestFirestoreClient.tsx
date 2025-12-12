@@ -6,7 +6,7 @@ import { collection, addDoc, getDocs, query, limit } from "firebase/firestore";
 import { Button } from "@/components/ui/Button";
 
 export default function TestFirestoreClient() {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -50,7 +50,7 @@ export default function TestFirestoreClient() {
     <div className="p-6 border rounded-lg shadow-sm space-y-4 bg-white max-w-md mx-auto mt-8">
       <h2 className="text-xl font-bold text-gray-800">Test Firestore Client</h2>
       <p className="text-sm text-gray-500">
-        Prueba de conexión a la colección 'test'.
+        Prueba de conexión a la colección test.
       </p>
 
       <div className="flex gap-3">
@@ -74,7 +74,9 @@ export default function TestFirestoreClient() {
         {data.length > 0 ? (
           <pre>{JSON.stringify(data, null, 2)}</pre>
         ) : (
-          <span className="text-gray-500">// Los datos aparecerán aquí...</span>
+          <span className="text-gray-500">
+            {"// Los datos aparecerán aquí..."}
+          </span>
         )}
       </div>
     </div>

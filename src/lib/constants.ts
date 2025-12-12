@@ -1,11 +1,11 @@
 export const CATEGORIES = [
   { id: "electronics", name: "Electrónica", icon: "📱" },
-  { id: "clothing", name: "Ropa y Accesorios", icon: "👕" },
-  { id: "home", name: "Hogar y Muebles", icon: "🏠" },
+  { id: "clothing", name: "Ropa y accesorios", icon: "👕" },
+  { id: "home", name: "Hogar y muebles", icon: "🛋️" },
   { id: "sports", name: "Deportes", icon: "⚽" },
   { id: "toys", name: "Juguetes", icon: "🧸" },
   { id: "books", name: "Libros", icon: "📚" },
-  { id: "other", name: "Otros", icon: "📦" },
+  { id: "other", name: "Otros", icon: "🛍️" },
 ];
 
 export const CONDITIONS = [

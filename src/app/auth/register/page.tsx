@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
@@ -14,9 +14,7 @@ const registerSchema = z
   .object({
     name: z.string().min(2, "El nombre es muy corto"),
     email: z.string().email("Email inválido"),
-    password: z
-      .string()
-      .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
     confirmPassword: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -31,6 +29,11 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterPage() {
   const [error, setError] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const nextParam = searchParams.get("next") || "/";
+  const nextPath = nextParam.startsWith("/") ? nextParam : "/";
+
   const {
     register,
     handleSubmit,
@@ -42,13 +45,16 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     setError("");
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      // Update display name immediately
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
       await updateProfile(userCredential.user, {
-        displayName: data.name
+        displayName: data.name,
       });
-      router.push("/");
-    } catch (e: any) {
+      router.push(nextPath);
+    } catch (e) {
       setError("Error al registrarse. El email podría estar en uso.");
       console.error(e);
     }
@@ -58,7 +64,7 @@ export default function RegisterPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-center text-2xl font-bold text-gray-900">
-          Crear Cuenta
+          Crear cuenta
         </h2>
       </div>
 
@@ -71,12 +77,13 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Nombre Completo
+            Nombre completo
           </label>
           <div className="mt-1">
             <input
               {...register("name")}
               type="text"
+              autoComplete="name"
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.name && (
@@ -95,6 +102,7 @@ export default function RegisterPage() {
             <input
               {...register("email")}
               type="email"
+              autoComplete="email"
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.email && (
@@ -113,6 +121,7 @@ export default function RegisterPage() {
             <input
               {...register("password")}
               type="password"
+              autoComplete="new-password"
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.password && (
@@ -125,12 +134,13 @@ export default function RegisterPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Confirmar Contraseña
+            Confirmar contraseña
           </label>
           <div className="mt-1">
             <input
               {...register("confirmPassword")}
               type="password"
+              autoComplete="new-password"
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.confirmPassword && (
@@ -165,9 +175,9 @@ export default function RegisterPage() {
         </div>
 
         <div className="mt-6">
-          <Link href="/auth/login">
+          <Link href={`/auth/login?next=${encodeURIComponent(nextPath)}`}>
             <Button variant="outline" className="w-full flex justify-center">
-              Iniciar Sesión
+              Iniciar sesión
             </Button>
           </Link>
         </div>

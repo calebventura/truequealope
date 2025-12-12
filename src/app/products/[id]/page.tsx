@@ -23,7 +23,9 @@ export default function ProductDetailPage() {
   const { user } = useAuth();
   const [contacting, setContacting] = useState(false);
   const [buying, setBuying] = useState(false);
-  const [sellerProfile, setSellerProfile] = useState<Partial<UserProfile> | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<Partial<UserProfile> | null>(
+    null
+  );
   const [contactClicks, setContactClicks] = useState<number | null>(null);
 
   const handleBuy = async () => {
@@ -33,6 +35,11 @@ export default function ProductDetailPage() {
     }
     if (!product) return;
 
+    if (product.price == null) {
+      alert("Este producto no tiene precio de venta.");
+      return;
+    }
+
     setBuying(true);
     try {
       const orderId = await createOrder(
@@ -41,9 +48,9 @@ export default function ProductDetailPage() {
         product.price
       );
       alert(`Orden creada con éxito. ID: ${orderId.orderId}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error al comprar:", error);
-      alert(`Error al crear la orden: ${error.message}`);
+      alert(`Error al crear la orden: ${(error as Error).message}`);
     } finally {
       setBuying(false);
     }
@@ -66,13 +73,11 @@ export default function ProductDetailPage() {
     try {
       await logContactClick(product.id!, user.uid, "whatsapp");
       if (user.uid === product.sellerId) {
-        // Si el vendedor prueba su propio botón, refrescamos el contador.
         const refreshed = await getContactClicksCount(product.id!);
         setContactClicks(refreshed);
       }
     } catch (error) {
       console.error("Error registrando clic de contacto:", error);
-      // No bloqueamos la apertura de WhatsApp.
     } finally {
       setContacting(false);
     }
@@ -100,6 +105,7 @@ export default function ProductDetailPage() {
             createdAt: data.createdAt?.toDate
               ? data.createdAt.toDate()
               : new Date(),
+            mode: data.mode ?? "sale",
           } as Product;
 
           setProduct(productData);
@@ -108,11 +114,9 @@ export default function ProductDetailPage() {
           }
 
           const sellerDoc = await getDoc(doc(db, "users", productData.sellerId));
-          if (sellerDoc.exists()) {
-            setSellerProfile(sellerDoc.data() as UserProfile);
-          } else {
-            setSellerProfile(null);
-          }
+          setSellerProfile(
+            sellerDoc.exists() ? (sellerDoc.data() as UserProfile) : null
+          );
         } else {
           setProduct(null);
         }
@@ -165,6 +169,8 @@ export default function ProductDetailPage() {
 
   const sellerIsOwner = user?.uid === product.sellerId;
   const contactDisabled = contacting || buying || !sellerProfile?.phoneNumber;
+  const buyDisabled =
+    buying || contacting || product.status === "reserved" || product.price == null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -191,7 +197,7 @@ export default function ProductDetailPage() {
 
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            {/* Galería de Imágenes */}
+            {/* Galería de imágenes */}
             <div className="p-6 bg-gray-100 flex flex-col gap-4">
               <div className="relative aspect-square w-full bg-white rounded-lg overflow-hidden shadow-sm">
                 {selectedImage ? (
@@ -233,7 +239,7 @@ export default function ProductDetailPage() {
               )}
             </div>
 
-            {/* Detalles del Producto */}
+            {/* Detalles del producto */}
             <div className="p-8 flex flex-col">
               <div className="mb-auto">
                 <div className="flex justify-between items-start mb-4">
@@ -269,7 +275,9 @@ export default function ProductDetailPage() {
                   {product.title}
                 </h1>
                 <p className="text-2xl font-bold text-blue-600 mb-6">
-                  ${product.price.toLocaleString()}
+                  {product.price != null
+                    ? `$${product.price.toLocaleString()}`
+                    : "Sin precio"}
                 </p>
 
                 <div className="prose prose-sm text-gray-600 mb-8">
@@ -292,13 +300,9 @@ export default function ProductDetailPage() {
                         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none">
                           <button
                             onClick={handleBuy}
-                            disabled={
-                              buying ||
-                              contacting ||
-                              product.status === "reserved"
-                            }
+                            disabled={buyDisabled}
                             className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-                              product.status === "reserved"
+                              buyDisabled
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                 : "bg-green-600 text-white hover:bg-green-700"
                             }`}
@@ -318,9 +322,11 @@ export default function ProductDetailPage() {
                             </svg>
                             {buying
                               ? "Procesando..."
+                              : product.price == null
+                              ? "Sin precio"
                               : product.status === "reserved"
                               ? "Reservado"
-                              : "Comprar Ahora"}
+                              : "Comprar ahora"}
                           </button>
                           <div className="flex flex-col gap-2">
                             <button
@@ -382,7 +388,7 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
-                {/* Spacer for mobile sticky footer */}
+
                 <div className="h-32 md:hidden"></div>
               </div>
             </div>

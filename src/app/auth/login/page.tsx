@@ -6,7 +6,7 @@ import { z } from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
@@ -20,6 +20,11 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const nextParam = searchParams.get("next") || "/";
+  const nextPath = nextParam.startsWith("/") ? nextParam : "/";
+
   const {
     register,
     handleSubmit,
@@ -32,8 +37,8 @@ export default function LoginPage() {
     setError("");
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
-      router.push("/");
-    } catch (e: any) {
+      router.push(nextPath);
+    } catch (e) {
       setError("Error al iniciar sesión. Verifica tus credenciales.");
       console.error(e);
     }
@@ -43,7 +48,7 @@ export default function LoginPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-center text-2xl font-bold text-gray-900">
-          Iniciar Sesión
+          Iniciar sesión
         </h2>
       </div>
 
@@ -62,6 +67,7 @@ export default function LoginPage() {
             <input
               {...register("email")}
               type="email"
+              autoComplete="email"
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.email && (
@@ -80,6 +86,7 @@ export default function LoginPage() {
             <input
               {...register("password")}
               type="password"
+              autoComplete="current-password"
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.password && (
@@ -93,7 +100,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-between">
           <div className="text-sm">
             <Link
-              href="/auth/forgot-password"
+              href={`/auth/forgot-password?next=${encodeURIComponent(nextPath)}`}
               className="font-medium text-blue-600 hover:text-blue-500"
             >
               ¿Olvidaste tu contraseña?
@@ -125,7 +132,7 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-6">
-          <Link href="/auth/register">
+          <Link href={`/auth/register?next=${encodeURIComponent(nextPath)}`}>
             <Button variant="outline" className="w-full flex justify-center">
               Regístrate
             </Button>

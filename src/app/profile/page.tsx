@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db, auth } from '@/lib/firebaseClient';
 import { uploadImage } from '@/lib/storage';
@@ -14,6 +14,9 @@ import { Button } from '@/components/ui/Button';
 export default function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const nextPath = nextParam?.startsWith('/') ? nextParam : null;
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -109,6 +112,11 @@ export default function ProfilePage() {
       // Update local state
       setFormData(updatedData);
       setMessage({ type: 'success', text: 'Perfil actualizado correctamente.' });
+
+      if (nextPath && updatedData.phoneNumber) {
+        router.push(nextPath);
+        return;
+      }
       
       // Force reload to update Navbar (optional, but helpful if context doesn't update immediately)
       router.refresh();

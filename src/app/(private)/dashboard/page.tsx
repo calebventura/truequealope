@@ -261,10 +261,12 @@ export default function DashboardPage() {
                       </Link>
                     </h3>
                     <p className="text-indigo-600 font-bold">
-                      {new Intl.NumberFormat("es-CL", {
-                        style: "currency",
-                        currency: "CLP",
-                      }).format(product.price)}
+                      {product.price != null
+                        ? new Intl.NumberFormat("es-CL", {
+                            style: "currency",
+                            currency: "CLP",
+                          }).format(product.price)
+                        : "Sin precio"}
                     </p>
                     <p className="text-sm text-gray-500 md:hidden">
                       {product.createdAt.toLocaleDateString()}
