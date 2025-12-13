@@ -223,7 +223,7 @@ export default function HomePage() {
 
                       {mode !== "trade" && product.price != null ? (
                         <p className="text-xl font-bold text-gray-900 mt-1">
-                          ${product.price.toLocaleString()}
+                          S/. {product.price.toLocaleString()}
                         </p>
                       ) : (
                         <p className="text-sm font-medium text-gray-700 mt-1">
@@ -272,4 +272,3 @@ export default function HomePage() {
     </div>
   );
 }
-

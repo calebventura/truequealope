@@ -404,7 +404,7 @@ export default function ProductDetailPage() {
 
                 {canSell && product.price != null ? (
                   <p className="text-2xl font-bold text-blue-600 mb-2">
-                    ${product.price.toLocaleString()}
+                    S/. {product.price.toLocaleString()}
                   </p>
                 ) : (
                   <p className="text-sm font-semibold text-gray-700 mb-2">

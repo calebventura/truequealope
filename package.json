@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:products": "node scripts/seed-products.js --yes",
+    "seed:products:dry": "node scripts/seed-products.js --dry-run",
+    "seed:cleanup": "node scripts/cleanup-seed-products.js --yes"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

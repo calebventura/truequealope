@@ -89,7 +89,13 @@ export async function generateMetadata({
         description,
         images: imageUrl ? [imageUrl] : undefined,
       },
-      other: price != null ? { "product:price:amount": `${price}` } : undefined,
+      other:
+        price != null
+          ? {
+              "product:price:amount": `${price}`,
+              "product:price:currency": "PEN",
+            }
+          : undefined,
     };
   } catch (error) {
     console.error("generateMetadata failed:", error);
@@ -108,4 +114,3 @@ export default function ProductLayout({
 }>) {
   return children;
 }
-

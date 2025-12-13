@@ -627,7 +627,7 @@ function BuyerActivity({ userId }: { userId: string }) {
                       {toDate(order.createdAt)?.toLocaleDateString() ?? ""}
                     </p>
                     <p className="mt-1 text-sm font-bold text-gray-900">
-                      ${order.price.toLocaleString()}
+                      S/. {order.price.toLocaleString()}
                     </p>
                   </div>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
