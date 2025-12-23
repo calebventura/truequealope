@@ -145,7 +145,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-900/70 md:hidden transition-colors"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegación inferior"
     >
@@ -156,9 +156,9 @@ export function BottomNav() {
             const href = item.private ? privateHref(item.href) : item.href;
 
             const base =
-              "flex flex-col items-center justify-center gap-1 py-2 text-xs font-medium";
-            const active = "text-indigo-700";
-            const inactive = "text-gray-600 hover:text-gray-900";
+              "flex flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors";
+            const active = "text-indigo-700 dark:text-indigo-400";
+            const inactive = "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200";
 
             return (
               <li key={item.key}>
@@ -166,7 +166,7 @@ export function BottomNav() {
                   href={href}
                   className={`${base} ${isActive ? active : inactive}`}
                 >
-                  <span className={isActive ? "text-indigo-700" : ""}>
+                  <span className={isActive ? "text-indigo-700 dark:text-indigo-400" : ""}>
                     {item.icon}
                   </span>
                   <span>{item.label}</span>

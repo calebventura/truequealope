@@ -194,25 +194,25 @@ function SellerActivity({ userId }: { userId: string }) {
   return (
     <div>
       {pendingOrders.length > 0 && (
-        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6 shadow-sm">
-          <h3 className="font-bold text-yellow-800 text-lg mb-4 flex items-center gap-2">
+        <div className="mb-8 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-6 shadow-sm transition-colors">
+          <h3 className="font-bold text-yellow-800 dark:text-yellow-200 text-lg mb-4 flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             Solicitudes Pendientes
           </h3>
           <div className="space-y-4">
             {pendingOrders.map((order) => (
-              <div key={order.id} className="bg-white p-4 rounded-lg border border-yellow-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div key={order.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-yellow-100 dark:border-yellow-900/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
                  <div>
-                    <p className="font-semibold text-gray-900">{order.productTitle}</p>
-                    <p className="text-sm text-gray-600">Comprador ID: {order.buyerId.slice(0, 8)}...</p>
-                    <p className="text-sm text-gray-500">{order.createdAt.toLocaleString()}</p>
-                    <p className="font-bold text-indigo-600 mt-1">S/. {order.price.toLocaleString()}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{order.productTitle}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Comprador ID: {order.buyerId.slice(0, 8)}...</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{order.createdAt.toLocaleString()}</p>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">S/. {order.price.toLocaleString()}</p>
                  </div>
                  <div className="flex gap-2 w-full md:w-auto">
-                    <Button onClick={() => handleOrderAction(order.id, 'confirm')} className="bg-green-600 hover:bg-green-700 flex-1 md:flex-none">
+                    <Button onClick={() => handleOrderAction(order.id, 'confirm')} className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500 flex-1 md:flex-none">
                         Confirmar Venta
                     </Button>
-                    <Button onClick={() => handleOrderAction(order.id, 'reject')} variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 flex-1 md:flex-none">
+                    <Button onClick={() => handleOrderAction(order.id, 'reject')} variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-900/20 flex-1 md:flex-none">
                         Rechazar
                     </Button>
                  </div>
@@ -223,47 +223,47 @@ function SellerActivity({ userId }: { userId: string }) {
       )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">
+            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
               Total Publicaciones
             </dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">
+            <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
               {products.length}
             </dd>
           </div>
         </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">
+            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
               Ventas Realizadas
             </dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">
+            <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
               {products.filter((p) => p.status === "sold").length}
             </dd>
           </div>
         </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">
+            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
               En Negociacion
             </dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">
+            <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
               {products.filter((p) => p.status === "reserved").length}
             </dd>
           </div>
         </div>
       </div>
 
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-gray-200 dark:border-gray-700 mb-6 transition-colors">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           <button
             onClick={() => setActiveTab("active")}
             className={`${
               activeTab === "active"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
           >
             Activos y Reservados
           </button>
@@ -271,9 +271,9 @@ function SellerActivity({ userId }: { userId: string }) {
             onClick={() => setActiveTab("history")}
             className={`${
               activeTab === "history"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
           >
             Historial de Ventas
           </button>
@@ -281,11 +281,11 @@ function SellerActivity({ userId }: { userId: string }) {
       </div>
 
       {loadingProducts ? (
-        <div className="text-center py-10">Cargando tus productos...</div>
+        <div className="text-center py-10 text-gray-600 dark:text-gray-400">Cargando tus productos...</div>
       ) : displayedProducts.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow transition-colors">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -297,7 +297,7 @@ function SellerActivity({ userId }: { userId: string }) {
               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
             {activeTab === "active"
               ? "No tienes publicaciones activas"
               : "No tienes ventas registradas"}
@@ -315,7 +315,7 @@ function SellerActivity({ userId }: { userId: string }) {
           {displayedProducts.map((product) => (
             <div
               key={product.id}
-              className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 gap-4 bg-white shadow-sm"
+              className="flex flex-col md:flex-row md:items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 gap-4 bg-white dark:bg-gray-800 shadow-sm transition-colors"
             >
               <div className="flex items-center gap-4">
                 <div className="relative h-16 w-16 flex-shrink-0">
@@ -330,7 +330,7 @@ function SellerActivity({ userId }: { userId: string }) {
                   />
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">
+                  <h3 className="font-medium text-gray-900 dark:text-white">
                     <Link
                       href={`/products/${product.id}`}
                       className="hover:underline"
@@ -338,7 +338,7 @@ function SellerActivity({ userId }: { userId: string }) {
                       {product.title}
                     </Link>
                   </h3>
-                  <p className="text-indigo-600 font-bold">
+                  <p className="text-indigo-600 dark:text-indigo-400 font-bold">
                     {product.price != null
                       ? new Intl.NumberFormat("es-CL", {
                           style: "currency",
@@ -346,17 +346,17 @@ function SellerActivity({ userId }: { userId: string }) {
                         }).format(product.price)
                       : "Sin precio"}
                   </p>
-                  <p className="text-sm text-gray-500 md:hidden">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
                     {product.createdAt.toLocaleDateString()}
                   </p>
                   <div className="mt-1 md:hidden">
                     <span
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         product.status === "active"
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
                           : product.status === "reserved"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
                       }`}
                     >
                       {product.status === "active"
@@ -366,16 +366,16 @@ function SellerActivity({ userId }: { userId: string }) {
                         : "Vendido"}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Clics en Contactar:{" "}
-                    <span className="font-semibold text-gray-800">
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">
                       {contactCounts[product.id!] ?? 0}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="hidden md:block text-sm text-gray-500">
+              <div className="hidden md:block text-sm text-gray-500 dark:text-gray-400">
                 {product.createdAt.toLocaleDateString()}
               </div>
 
@@ -383,10 +383,10 @@ function SellerActivity({ userId }: { userId: string }) {
                 <span
                   className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     product.status === "active"
-                      ? "bg-green-100 text-green-800"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
                       : product.status === "reserved"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-gray-100 text-gray-800"
+                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {product.status === "active"
@@ -401,28 +401,28 @@ function SellerActivity({ userId }: { userId: string }) {
                 {product.status !== "sold" ? (
                   <>
                     <Link href={`/products/${product.id}/edit`} className="flex-1 md:flex-none">
-                        <button className="w-full text-center px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-md hover:bg-gray-100 border border-gray-200">
+                        <button className="w-full text-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 transition-colors">
                             Editar
                         </button>
                     </Link>
                     {product.status === "active" ? (
                       <button
                         onClick={() => handleStatusChange(product.id!, "reserved")}
-                        className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-yellow-600 bg-yellow-50 rounded-md hover:bg-yellow-100"
+                        className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-md hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors"
                       >
                         Reservar
                       </button>
                     ) : (
                       <button
                         onClick={() => handleStatusChange(product.id!, "active")}
-                        className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100"
+                        className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
                       >
                         Disponible
                       </button>
                     )}
                     <button
                       onClick={() => handleStatusChange(product.id!, "sold")}
-                      className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
+                      className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                     >
                       Vendido
                     </button>
@@ -430,14 +430,14 @@ function SellerActivity({ userId }: { userId: string }) {
                 ) : (
                   <button
                     onClick={() => handleStatusChange(product.id!, "active")}
-                    className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100"
+                    className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
                   >
                     Republicar
                   </button>
                 )}
                 <button
                   onClick={() => handleStatusChange(product.id!, "deleted")}
-                  className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+                  className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
                 >
                   Eliminar
                 </button>
@@ -605,18 +605,18 @@ function BuyerActivity({ userId }: { userId: string }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <section className="bg-white rounded-lg shadow-sm border">
-        <div className="px-5 py-4 border-b">
-          <h2 className="text-lg font-bold text-gray-900">Contactados</h2>
-          <p className="text-sm text-gray-500">
+      <section className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 transition-colors">
+        <div className="px-5 py-4 border-b dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Contactados</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Productos donde hiciste clic en contactar.
           </p>
         </div>
 
         {loadingContacted ? (
-          <div className="p-6 text-center text-gray-600">Cargando...</div>
+          <div className="p-6 text-center text-gray-600 dark:text-gray-400">Cargando...</div>
         ) : contacted.length === 0 ? (
-          <div className="p-6 text-center text-gray-600">
+          <div className="p-6 text-center text-gray-600 dark:text-gray-400">
             Aun no has contactado productos.
             <div className="mt-4">
               <Link href="/search">
@@ -625,7 +625,7 @@ function BuyerActivity({ userId }: { userId: string }) {
             </div>
           </div>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-y dark:divide-gray-700">
             {contacted.map((item) => {
               const product = item.product;
               const categoryName = product
@@ -636,7 +636,7 @@ function BuyerActivity({ userId }: { userId: string }) {
               return (
                 <li key={item.productId} className="p-4">
                   <div className="flex gap-4">
-                    <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                    <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-700">
                       {product?.images?.[0] ? (
                         <Image
                           src={product.images[0]}
@@ -654,23 +654,23 @@ function BuyerActivity({ userId }: { userId: string }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">
+                          <p className="font-semibold text-gray-900 dark:text-white truncate">
                             {product?.title ?? "Producto no disponible"}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
                             {categoryName ? `${categoryName} · ` : ""}
                             Ultimo: {item.lastAt.toLocaleDateString()}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs text-gray-500">Clics</p>
-                          <p className="font-bold text-gray-900">{item.count}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Clics</p>
+                          <p className="font-bold text-gray-900 dark:text-white">{item.count}</p>
                         </div>
                       </div>
 
                       <div className="mt-3 flex gap-2">
                         <Link href={`/products/${item.productId}`}>
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" className="dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700">
                             Ver
                           </Button>
                         </Link>
@@ -684,16 +684,16 @@ function BuyerActivity({ userId }: { userId: string }) {
         )}
       </section>
 
-      <section className="bg-white rounded-lg shadow-sm border">
-        <div className="px-5 py-4 border-b">
-          <h2 className="text-lg font-bold text-gray-900">Mis compras</h2>
-          <p className="text-sm text-gray-500">Historial de compras.</p>
+      <section className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 transition-colors">
+        <div className="px-5 py-4 border-b dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mis compras</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Historial de compras.</p>
         </div>
 
         {loadingOrders ? (
-          <div className="p-6 text-center text-gray-600">Cargando...</div>
+          <div className="p-6 text-center text-gray-600 dark:text-gray-400">Cargando...</div>
         ) : orders.length === 0 ? (
-          <div className="p-6 text-center text-gray-600">
+          <div className="p-6 text-center text-gray-600 dark:text-gray-400">
             No has realizado compras aun.
             <div className="mt-4">
               <Link href="/search">
@@ -702,34 +702,34 @@ function BuyerActivity({ userId }: { userId: string }) {
             </div>
           </div>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-y dark:divide-gray-700">
             {orders.map((order) => (
               <li key={order.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">
+                    <p className="font-semibold text-gray-900 dark:text-white truncate">
                       {order.productTitle}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       {toDate(order.createdAt)?.toLocaleDateString() ?? ""}
                     </p>
-                    <p className="mt-1 text-sm font-bold text-gray-900">
+                    <p className="mt-1 text-sm font-bold text-gray-900 dark:text-gray-100">
                       S/. {order.price.toLocaleString()}
                     </p>
                   </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 capitalize">
                     {order.status === "completed" ? "Completado" : order.status}
                   </span>
                 </div>
                 <div className="mt-3 flex gap-2 flex-wrap">
                   <button
                     onClick={() => handleContactSeller(order)}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     Contactar vendedor
                   </button>
                   <Link href={`/products/${order.productId}`}>
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" className="dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700">
                       Ver producto
                     </Button>
                   </Link>
@@ -769,12 +769,12 @@ function ActivityContent() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Actividad</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Actividad</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Vistas, contactos y compras en un solo lugar.
             </p>
           </div>
@@ -783,15 +783,15 @@ function ActivityContent() {
           </Link>
         </div>
 
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6 transition-colors">
           <nav className="-mb-px flex gap-6" aria-label="Tabs">
             <button
               type="button"
               onClick={() => setTabAndUrl("seller")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 tab === "seller"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
               }`}
             >
               Como vendedor
@@ -799,10 +799,10 @@ function ActivityContent() {
             <button
               type="button"
               onClick={() => setTabAndUrl("buyer")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 tab === "buyer"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
               }`}
             >
               Como comprador
