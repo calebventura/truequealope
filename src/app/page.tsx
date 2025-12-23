@@ -7,10 +7,12 @@ import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
 
 type ModeFilter = "all" | "sale" | "trade";
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
@@ -57,7 +59,11 @@ export default function HomePage() {
             return b.createdAt.getTime() - a.createdAt.getTime();
         });
 
-        setProducts(validProducts);
+        const visibleProducts = user
+          ? validProducts.filter((p) => p.sellerId !== user.uid)
+          : validProducts;
+
+        setProducts(visibleProducts);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {
@@ -66,7 +72,7 @@ export default function HomePage() {
     };
 
     fetchProducts();
-  }, []);
+  }, [user]);
 
   const filteredProducts = products.filter((product) => {
     const mode = product.mode ?? "sale";
