@@ -229,7 +229,7 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
       </div>
     );
@@ -237,11 +237,11 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">
           Producto no encontrado
         </h1>
-        <Link href="/" className="text-blue-600 hover:underline">
+        <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">
           Volver al inicio
         </Link>
       </div>
@@ -270,12 +270,12 @@ export default function ProductDetailPage() {
     mode === "trade" ? "Trueque" : mode === "both" ? "Venta / Trueque" : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3 mb-6">
           <Link
             href="/"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            className="inline-flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -297,7 +297,7 @@ export default function ProductDetailPage() {
             type="button"
             onClick={handleShare}
             disabled={sharing}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
           >
             <svg
               aria-hidden="true"
@@ -317,11 +317,11 @@ export default function ProductDetailPage() {
           </button>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden border border-transparent dark:border-gray-800 transition-colors">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
             {/* Galería de imágenes */}
-            <div className="p-6 bg-gray-100 flex flex-col gap-4">
-              <div className="relative aspect-square w-full bg-white rounded-lg overflow-hidden shadow-sm">
+            <div className="p-6 bg-gray-100 dark:bg-gray-800 flex flex-col gap-4 transition-colors">
+              <div className="relative aspect-square w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm transition-colors">
                 {selectedImage ? (
                   <Image
                     src={selectedImage}
@@ -331,7 +331,7 @@ export default function ProductDetailPage() {
                     priority
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400">
+                  <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
                     Sin imagen
                   </div>
                 )}
@@ -367,15 +367,15 @@ export default function ProductDetailPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-2 flex-wrap">
                     {modeBadge && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 uppercase">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-100 uppercase">
                         {modeBadge}
                       </span>
                     )}
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
                       {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
                         "Otro"}
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 capitalize">
                       {product.condition === "like-new"
                         ? "Como nuevo"
                         : product.condition === "new"
@@ -383,45 +383,45 @@ export default function ProductDetailPage() {
                         : "Usado"}
                     </span>
                     {product.status === "reserved" && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 uppercase">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 uppercase">
                         Reservado
                       </span>
                     )}
                     {product.status === "sold" && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 uppercase">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100 uppercase">
                         Vendido
                       </span>
                     )}
                   </div>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
                     {product.createdAt.toLocaleDateString()}
                   </span>
                 </div>
 
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   {product.title}
                 </h1>
 
                 {canSell && product.price != null ? (
-                  <p className="text-2xl font-bold text-blue-600 mb-2">
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-2">
                     S/. {product.price.toLocaleString()}
                   </p>
                 ) : (
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     {canTrade ? "Solo trueque" : "Sin precio"}
                   </p>
                 )}
 
                 {canTrade && wantedPreview && (
                   <div className="mb-4">
-                    <p className="text-sm font-medium text-gray-800">
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                       Busco a cambio:
                     </p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {wantedItems.map((item, index) => (
                         <span
                           key={`${item}-${index}`}
-                          className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm"
+                          className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-sm"
                         >
                           {item}
                         </span>
@@ -430,15 +430,15 @@ export default function ProductDetailPage() {
                   </div>
                 )}
 
-                <div className="prose prose-sm text-gray-600 mb-8">
+                <div className="prose prose-sm text-gray-600 dark:text-gray-300 mb-8">
                   <p>{product.description || "Sin descripción."}</p>
                 </div>
 
-                <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
                   {!sellerIsOwner ? (
                     <>
                       {product.status === "sold" ? (
-                        <div className="w-full bg-red-50 border border-red-200 text-red-700 py-4 px-4 rounded-lg text-center">
+                        <div className="w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 py-4 px-4 rounded-lg text-center">
                           <p className="font-semibold">
                             Este producto ya se vendió
                           </p>
@@ -447,15 +447,15 @@ export default function ProductDetailPage() {
                           </p>
                         </div>
                       ) : (
-                        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none">
+                        <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800 md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none transition-colors">
                           {canSell && (
                             <button
                               onClick={handleBuy}
                               disabled={buyDisabled}
                               className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
                                 buyDisabled
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-green-600 text-white hover:bg-green-700"
+                                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                  : "bg-green-600 dark:bg-green-600 text-white hover:bg-green-700 dark:hover:bg-green-500"
                               }`}
                             >
                               <svg
@@ -485,7 +485,7 @@ export default function ProductDetailPage() {
                             <button
                               onClick={handleContactSale}
                               disabled={whatsappDisabled}
-                              className="w-full bg-white border border-green-600 text-green-700 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                              className="w-full bg-white dark:bg-gray-800 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                               <svg
                                 className="w-5 h-5"
@@ -510,7 +510,7 @@ export default function ProductDetailPage() {
                             <button
                               onClick={handleOfferTrade}
                               disabled={whatsappDisabled}
-                              className="w-full bg-white border border-indigo-600 text-indigo-700 py-3 px-4 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                              className="w-full bg-white dark:bg-gray-800 border border-indigo-600 dark:border-indigo-500 text-indigo-700 dark:text-indigo-400 py-3 px-4 rounded-lg font-semibold hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                               <svg
                                 className="w-5 h-5"
@@ -532,7 +532,7 @@ export default function ProductDetailPage() {
                           )}
 
                           {user && !sellerLoading && !sellerProfile?.phoneNumber && (
-                            <p className="text-xs text-red-600 text-center">
+                            <p className="text-xs text-red-600 dark:text-red-400 text-center">
                               El vendedor aún no cargó su número de WhatsApp.
                             </p>
                           )}
@@ -541,18 +541,18 @@ export default function ProductDetailPage() {
                     </>
                   ) : (
                     <div className="flex flex-col gap-3">
-                      <div className="w-full bg-gray-100 text-gray-500 py-3 px-4 rounded-lg font-semibold text-center">
+                      <div className="w-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 py-3 px-4 rounded-lg font-semibold text-center transition-colors">
                         Esta es tu publicación
                       </div>
 
-                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <p className="text-sm font-medium text-blue-900 mb-1">
+                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900 transition-colors">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
                           Clics en “Contactar” (WhatsApp)
                         </p>
-                        <p className="text-2xl font-bold text-blue-800">
+                        <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                           {contactClicks !== null ? contactClicks : "—"}
                         </p>
-                        <p className="text-xs text-blue-700">
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
                           Se cuentan cada vez que un usuario abre el enlace de
                           WhatsApp.
                         </p>
@@ -560,7 +560,7 @@ export default function ProductDetailPage() {
 
                       <Link
                         href="/activity?tab=seller"
-                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 transition-colors"
+                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold text-center hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors"
                       >
                         Gestionar en Dashboard
                       </Link>

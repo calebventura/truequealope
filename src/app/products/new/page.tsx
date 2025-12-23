@@ -199,16 +199,16 @@ export default function NewProductPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg mt-10">
-      <h1 className="text-2xl font-bold mb-2 text-gray-800">
+    <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-md rounded-lg mt-10 transition-colors">
+      <h1 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">
         Publicar un producto
       </h1>
-      <p className="text-sm text-gray-500 mb-6">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Paso {step} de 3
       </p>
 
       {generalError && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-200 rounded-md text-sm transition-colors">
           {generalError}
         </div>
       )}
@@ -218,7 +218,7 @@ export default function NewProductPage() {
           <>
             {/* Imágenes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Imágenes del producto
               </label>
               <input
@@ -226,18 +226,19 @@ export default function NewProductPage() {
                 accept="image/*"
                 multiple
                 {...register("images")}
-                className="mt-1 block w-full text-sm text-gray-500
+                className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md transition-colors
                   file:mr-4 file:py-2 file:px-4
                   file:rounded-full file:border-0
                   file:text-sm file:font-semibold
                   file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100"
+                  dark:file:bg-gray-700 dark:file:text-gray-100
+                  hover:file:bg-blue-100 dark:hover:file:bg-gray-600"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Puedes seleccionar múltiples archivos.
               </p>
               {errors.images && (
-                <p className="mt-1 text-xs text-red-500">
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {errors.images.message as string}
                 </p>
               )}
@@ -245,17 +246,17 @@ export default function NewProductPage() {
 
             {/* Título */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Título
               </label>
               <input
                 type="text"
                 {...register("title")}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                 placeholder="Ej: Bicicleta de montaña"
               />
               {errors.title && (
-                <p className="mt-1 text-xs text-red-500">
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {errors.title.message}
                 </p>
               )}
@@ -267,25 +268,25 @@ export default function NewProductPage() {
           <>
             {/* Modo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 ¿Cómo quieres publicarlo?
               </label>
               <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
                   <input type="radio" value="sale" {...register("mode")} />
                   Solo venta
                 </label>
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
                   <input type="radio" value="trade" {...register("mode")} />
                   Solo trueque
                 </label>
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
                   <input type="radio" value="both" {...register("mode")} />
                   Venta o trueque
                 </label>
               </div>
               {errors.mode && (
-                <p className="mt-1 text-xs text-red-500">
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {errors.mode.message}
                 </p>
               )}
@@ -294,17 +295,17 @@ export default function NewProductPage() {
             {/* Precio */}
             {(mode === "sale" || mode === "both") && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Precio (S/.)
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   {...register("price", { valueAsNumber: true })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                 />
                 {errors.price && (
-                  <p className="mt-1 text-xs text-red-500">
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                     {errors.price.message}
                   </p>
                 )}
@@ -314,20 +315,20 @@ export default function NewProductPage() {
             {/* Busco */}
             {(mode === "trade" || mode === "both") && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Busco a cambio
                 </label>
                 <input
                   type="text"
                   {...register("wanted")}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                   placeholder="Ej: consola, tablet, ropa de bebé"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Puedes separar varias opciones con comas.
                 </p>
                 {errors.wanted && (
-                  <p className="mt-1 text-xs text-red-500">
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                     {errors.wanted.message}
                   </p>
                 )}
@@ -337,12 +338,12 @@ export default function NewProductPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Categoría */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Categoría
                 </label>
                 <select
                   {...register("categoryId")}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base bg-white"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
                 >
                   <option value="">Selecciona una categoría</option>
                   {CATEGORIES.map((cat) => (
@@ -352,7 +353,7 @@ export default function NewProductPage() {
                   ))}
                 </select>
                 {errors.categoryId && (
-                  <p className="mt-1 text-xs text-red-500">
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                     {errors.categoryId.message}
                   </p>
                 )}
@@ -360,12 +361,12 @@ export default function NewProductPage() {
 
               {/* Condición */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Condición (opcional)
                 </label>
                 <select
                   {...register("condition")}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base bg-white"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
                 >
                   <option value="">Selecciona el estado</option>
                   {CONDITIONS.map((cond) => (
@@ -383,17 +384,17 @@ export default function NewProductPage() {
           <>
             {/* Ubicación */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Ubicación
               </label>
               <input
                 type="text"
                 {...register("location")}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                 placeholder="Ej: Palermo, Buenos Aires"
               />
               {errors.location && (
-                <p className="mt-1 text-xs text-red-500">
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {errors.location.message}
                 </p>
               )}
@@ -401,13 +402,13 @@ export default function NewProductPage() {
 
             {/* Descripción */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Descripción (opcional)
               </label>
               <textarea
                 {...register("description")}
                 rows={4}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-base"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                 placeholder="Describe brevemente el estado y detalles."
               />
             </div>
@@ -419,7 +420,7 @@ export default function NewProductPage() {
             <button
               type="button"
               onClick={prevStep}
-              className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Atrás
             </button>
@@ -431,7 +432,7 @@ export default function NewProductPage() {
             <button
               type="button"
               onClick={nextStep}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors"
             >
               Continuar
             </button>
@@ -439,7 +440,7 @@ export default function NewProductPage() {
             <button
               type="submit"
               disabled={isSubmitting || uploading}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 transition-colors"
             >
               {uploading
                 ? "Subiendo imágenes..."

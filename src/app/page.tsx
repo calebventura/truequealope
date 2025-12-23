@@ -7,10 +7,12 @@ import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
 
 type ModeFilter = "all" | "sale" | "trade";
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
@@ -20,7 +22,7 @@ export default function HomePage() {
       try {
         const q = query(
           collection(db, "products"),
-          where("status", "in", ["active", "reserved"])
+          where("status", "in", ["active", "reserved", "sold"])
         );
 
         const querySnapshot = await getDocs(q);
@@ -31,13 +33,37 @@ export default function HomePage() {
             createdAt: docSnap.data().createdAt?.toDate
               ? docSnap.data().createdAt.toDate()
               : new Date(),
+            soldAt: docSnap.data().soldAt?.toDate
+              ? docSnap.data().soldAt.toDate()
+              : docSnap.data().soldAt ? new Date(docSnap.data().soldAt) : undefined,
           })) as Product[];
 
-        productsData.sort(
-          (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-        );
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        setProducts(productsData);
+        const validProducts = productsData.filter(p => {
+            if (p.status === 'sold') {
+                if (!p.soldAt) return false; // Hide if soldAt missing
+                return p.soldAt > oneDayAgo;
+            }
+            return true;
+        });
+
+        validProducts.sort((a, b) => {
+            // Priority: Active/Reserved (0) < Sold (1)
+            const scoreA = a.status === 'sold' ? 1 : 0;
+            const scoreB = b.status === 'sold' ? 1 : 0;
+            
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
+
+        const visibleProducts = user
+          ? validProducts.filter((p) => p.sellerId !== user.uid)
+          : validProducts;
+
+        setProducts(visibleProducts);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {
@@ -46,7 +72,7 @@ export default function HomePage() {
     };
 
     fetchProducts();
-  }, []);
+  }, [user]);
 
   const filteredProducts = products.filter((product) => {
     const mode = product.mode ?? "sale";
@@ -57,21 +83,21 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero */}
-        <section className="bg-white rounded-2xl p-6 md:p-8 shadow-sm mb-10">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900">
+        <section className="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 shadow-sm mb-10 transition-colors border border-transparent dark:border-gray-800">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white">
             Cambia o vende lo que no usas
           </h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-600 dark:text-gray-300">
             Publica en minutos, coordina por WhatsApp y encuentra oportunidades
             cerca de ti.
           </p>
@@ -84,7 +110,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/search"
-              className="bg-white border border-gray-300 text-gray-800 px-5 py-3 rounded-lg text-center font-semibold hover:bg-gray-50 transition-colors"
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 px-5 py-3 rounded-lg text-center font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               Explorar productos
             </Link>
@@ -93,7 +119,7 @@ export default function HomePage() {
 
         {/* Categorías */}
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Categorías
           </h2>
           <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-hide snap-x snap-mandatory">
@@ -101,10 +127,10 @@ export default function HomePage() {
               <Link
                 key={category.id}
                 href={`/search?category=${category.id}`}
-                className="flex-shrink-0 w-32 h-32 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 hover:shadow-md transition-shadow border border-gray-100 snap-start"
+                className="flex-shrink-0 w-32 h-32 bg-white dark:bg-gray-900 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 hover:shadow-md transition-all border border-gray-100 dark:border-gray-800 snap-start"
               >
                 <span className="text-3xl">{category.icon}</span>
-                <span className="font-medium text-gray-900 text-sm text-center px-2">
+                <span className="font-medium text-gray-900 dark:text-gray-200 text-sm text-center px-2">
                   {category.name}
                 </span>
               </Link>
@@ -114,17 +140,17 @@ export default function HomePage() {
 
         {/* Header + filtro modo */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             Productos recientes
           </h2>
-          <div className="inline-flex rounded-lg bg-white p-1 border shadow-sm w-fit">
+          <div className="inline-flex rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors">
             <button
               type="button"
               onClick={() => setModeFilter("all")}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 modeFilter === "all"
                   ? "bg-indigo-600 text-white"
-                  : "text-gray-700 hover:bg-gray-100"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               Ambos
@@ -135,7 +161,7 @@ export default function HomePage() {
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 modeFilter === "sale"
                   ? "bg-indigo-600 text-white"
-                  : "text-gray-700 hover:bg-gray-100"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               Venta
@@ -146,7 +172,7 @@ export default function HomePage() {
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 modeFilter === "trade"
                   ? "bg-indigo-600 text-white"
-                  : "text-gray-700 hover:bg-gray-100"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               Trueque
@@ -155,15 +181,15 @@ export default function HomePage() {
         </div>
 
         {filteredProducts.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-            <p className="text-gray-500 text-lg">
+          <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-sm dark:border dark:border-gray-800 transition-colors">
+            <p className="text-gray-500 dark:text-gray-400 text-lg">
               No hay productos para este filtro.
             </p>
             {modeFilter !== "all" && (
               <button
                 type="button"
                 onClick={() => setModeFilter("all")}
-                className="mt-3 text-indigo-600 hover:text-indigo-500 font-medium"
+                className="mt-3 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium"
               >
                 Ver todos
               </button>
@@ -190,15 +216,15 @@ export default function HomePage() {
                   href={`/products/${product.id}`}
                   className="group"
                 >
-                  <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
-                    <div className="relative aspect-square w-full bg-gray-200">
+                  <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border border-transparent dark:border-gray-800">
+                    <div className="relative aspect-square w-full bg-gray-200 dark:bg-gray-800">
                       {modeBadge && (
-                        <div className="absolute top-2 left-2 z-10 bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                        <div className="absolute top-2 left-2 z-10 bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
                           {modeBadge}
                         </div>
                       )}
                       {product.status === "reserved" && (
-                        <div className="absolute top-2 right-2 z-10 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                        <div className="absolute top-2 right-2 z-10 bg-yellow-100 dark:bg-yellow-900/80 text-yellow-800 dark:text-yellow-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
                           Reservado
                         </div>
                       )}
@@ -211,33 +237,33 @@ export default function HomePage() {
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                       ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
+                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
                           Sin imagen
                         </div>
                       )}
                     </div>
                     <div className="p-4 flex flex-col flex-grow">
-                      <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">
                         {product.title}
                       </h3>
 
                       {mode !== "trade" && product.price != null ? (
-                        <p className="text-xl font-bold text-gray-900 mt-1">
+                        <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
                           S/. {product.price.toLocaleString()}
                         </p>
                       ) : (
-                        <p className="text-sm font-medium text-gray-700 mt-1">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
                           {mode === "trade" ? "Solo trueque" : "Sin precio"}
                         </p>
                       )}
 
                       {(mode === "trade" || mode === "both") && wantedText && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
                           Busco: {wantedText}
                         </p>
                       )}
 
-                      <div className="mt-auto pt-4 flex items-center justify-between text-sm text-gray-500">
+                      <div className="mt-auto pt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                         <span className="flex items-center">
                           <svg
                             className="w-4 h-4 mr-1"

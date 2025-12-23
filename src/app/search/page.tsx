@@ -41,7 +41,9 @@ function SearchContent() {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const constraints: QueryConstraint[] = [where("status", "==", "active")];
+        const constraints: QueryConstraint[] = [
+           where("status", "in", ["active", "reserved", "sold"])
+        ];
 
         if (selectedCategory) {
           constraints.push(where("categoryId", "==", selectedCategory));
@@ -56,7 +58,21 @@ function SearchContent() {
           createdAt: docSnap.data().createdAt?.toDate
             ? docSnap.data().createdAt.toDate()
             : new Date(),
+          soldAt: docSnap.data().soldAt?.toDate
+              ? docSnap.data().soldAt.toDate()
+              : docSnap.data().soldAt ? new Date(docSnap.data().soldAt) : undefined,
         })) as Product[];
+
+        // Filter sold items > 24h
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        results = results.filter(p => {
+             if (p.status === 'sold') {
+                 if (!p.soldAt) return false;
+                 return p.soldAt > oneDayAgo;
+             }
+             return true;
+        });
 
         if (searchTerm) {
           const lowerTerm = searchTerm.toLowerCase();
@@ -67,7 +83,16 @@ function SearchContent() {
           );
         }
 
-        results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        results.sort((a, b) => {
+            // Priority: Active/Reserved (0) < Sold (1)
+            const scoreA = a.status === 'sold' ? 1 : 0;
+            const scoreB = b.status === 'sold' ? 1 : 0;
+            
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
+
         setProducts(results);
       } catch (error) {
         console.error("Error buscando productos:", error);
@@ -87,14 +112,14 @@ function SearchContent() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
           Explorar productos
         </h1>
 
         {/* Filtros */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-8 space-y-4">
+        <div className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm mb-8 space-y-4 dark:border dark:border-gray-800 transition-colors">
           <form
             onSubmit={handleSearch}
             className="flex flex-col md:flex-row gap-4"
@@ -106,7 +131,7 @@ function SearchContent() {
                 placeholder="¿Qué estás buscando?"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-4 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-4 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
               />
             </div>
             <div className="w-full md:w-48">
@@ -114,7 +139,7 @@ function SearchContent() {
                 id="category"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
               >
                 <option value="">Todas las categorías</option>
                 {CATEGORIES.map((cat) => (
@@ -126,21 +151,21 @@ function SearchContent() {
             </div>
             <button
               type="submit"
-              className="w-full md:w-auto bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              className="w-full md:w-auto bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors font-medium"
             >
               Buscar
             </button>
           </form>
 
           {/* Filtro por modo */}
-          <div className="inline-flex rounded-lg bg-gray-50 p-1 border w-fit">
+          <div className="inline-flex rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors">
             <button
               type="button"
               onClick={() => setModeFilter("all")}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 modeFilter === "all"
                   ? "bg-indigo-600 text-white"
-                  : "text-gray-700 hover:bg-white"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
               }`}
             >
               Ambos
@@ -151,7 +176,7 @@ function SearchContent() {
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 modeFilter === "sale"
                   ? "bg-indigo-600 text-white"
-                  : "text-gray-700 hover:bg-white"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
               }`}
             >
               Venta
@@ -162,7 +187,7 @@ function SearchContent() {
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 modeFilter === "trade"
                   ? "bg-indigo-600 text-white"
-                  : "text-gray-700 hover:bg-white"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
               }`}
             >
               Trueque
@@ -176,9 +201,9 @@ function SearchContent() {
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+          <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-sm dark:border dark:border-gray-800 transition-colors">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
+              className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -190,10 +215,10 @@ function SearchContent() {
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
               No se encontraron productos
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Intenta con otros términos, categorías o filtros.
             </p>
             <div className="mt-6">
@@ -204,7 +229,7 @@ function SearchContent() {
                   setModeFilter("all");
                   router.push("/search");
                 }}
-                className="text-blue-600 hover:text-blue-500 font-medium"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium"
               >
                 Limpiar filtros
               </button>
@@ -231,10 +256,10 @@ function SearchContent() {
                   href={`/products/${product.id}`}
                   className="group"
                 >
-                  <div className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
-                    <div className="relative h-48 w-full bg-gray-200">
+                  <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border border-transparent dark:border-gray-800">
+                    <div className="relative h-48 w-full bg-gray-200 dark:bg-gray-800">
                       {modeBadge && (
-                        <div className="absolute top-2 left-2 z-10 bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                        <div className="absolute top-2 left-2 z-10 bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
                           {modeBadge}
                         </div>
                       )}
@@ -246,34 +271,34 @@ function SearchContent() {
                           className="object-cover group-hover:scale-105 transition-transform duration-200"
                         />
                       ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
+                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
                           Sin imagen
                         </div>
                       )}
                     </div>
                     <div className="p-4 flex flex-col flex-grow">
-                      <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">
                         {product.title}
                       </h3>
 
                       {mode !== "trade" && product.price != null ? (
-                        <p className="text-xl font-bold text-gray-900 mt-1">
+                        <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
                           S/. {product.price.toLocaleString()}
                         </p>
                       ) : (
-                        <p className="text-sm font-medium text-gray-700 mt-1">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
                           {mode === "trade" ? "Solo trueque" : "Sin precio"}
                         </p>
                       )}
 
                       {(mode === "trade" || mode === "both") && wantedText && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
                           Busco: {wantedText}
                         </p>
                       )}
 
-                      <div className="mt-auto pt-4 flex items-center justify-between text-sm text-gray-500">
-                        <span className="capitalize bg-gray-100 px-2 py-1 rounded text-xs">
+                      <div className="mt-auto pt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                        <span className="capitalize bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">
                           {CATEGORIES.find((c) => c.id === product.categoryId)
                             ?.name || "Otro"}
                         </span>
