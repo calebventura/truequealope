@@ -20,7 +20,7 @@ export default function HomePage() {
       try {
         const q = query(
           collection(db, "products"),
-          where("status", "in", ["active", "reserved"])
+          where("status", "in", ["active", "reserved", "sold"])
         );
 
         const querySnapshot = await getDocs(q);
@@ -31,13 +31,33 @@ export default function HomePage() {
             createdAt: docSnap.data().createdAt?.toDate
               ? docSnap.data().createdAt.toDate()
               : new Date(),
+            soldAt: docSnap.data().soldAt?.toDate
+              ? docSnap.data().soldAt.toDate()
+              : docSnap.data().soldAt ? new Date(docSnap.data().soldAt) : undefined,
           })) as Product[];
 
-        productsData.sort(
-          (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-        );
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        setProducts(productsData);
+        const validProducts = productsData.filter(p => {
+            if (p.status === 'sold') {
+                if (!p.soldAt) return false; // Hide if soldAt missing
+                return p.soldAt > oneDayAgo;
+            }
+            return true;
+        });
+
+        validProducts.sort((a, b) => {
+            // Priority: Active/Reserved (0) < Sold (1)
+            const scoreA = a.status === 'sold' ? 1 : 0;
+            const scoreB = b.status === 'sold' ? 1 : 0;
+            
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
+
+        setProducts(validProducts);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {

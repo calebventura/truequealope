@@ -41,7 +41,9 @@ function SearchContent() {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const constraints: QueryConstraint[] = [where("status", "==", "active")];
+        const constraints: QueryConstraint[] = [
+           where("status", "in", ["active", "reserved", "sold"])
+        ];
 
         if (selectedCategory) {
           constraints.push(where("categoryId", "==", selectedCategory));
@@ -56,7 +58,21 @@ function SearchContent() {
           createdAt: docSnap.data().createdAt?.toDate
             ? docSnap.data().createdAt.toDate()
             : new Date(),
+          soldAt: docSnap.data().soldAt?.toDate
+              ? docSnap.data().soldAt.toDate()
+              : docSnap.data().soldAt ? new Date(docSnap.data().soldAt) : undefined,
         })) as Product[];
+
+        // Filter sold items > 24h
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        results = results.filter(p => {
+             if (p.status === 'sold') {
+                 if (!p.soldAt) return false;
+                 return p.soldAt > oneDayAgo;
+             }
+             return true;
+        });
 
         if (searchTerm) {
           const lowerTerm = searchTerm.toLowerCase();
@@ -67,7 +83,16 @@ function SearchContent() {
           );
         }
 
-        results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        results.sort((a, b) => {
+            // Priority: Active/Reserved (0) < Sold (1)
+            const scoreA = a.status === 'sold' ? 1 : 0;
+            const scoreB = b.status === 'sold' ? 1 : 0;
+            
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
+
         setProducts(results);
       } catch (error) {
         console.error("Error buscando productos:", error);

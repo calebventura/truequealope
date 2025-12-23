@@ -18,10 +18,17 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ensureUserProfile } from "@/lib/userProfile";
 
+import {
+  doc,
+  setDoc,
+} from "firebase/firestore";
+import { db } from "@/lib/firebaseClient";
+
 const registerSchema = z
   .object({
     name: z.string().min(2, "El nombre es muy corto"),
     email: z.string().email("Email inválido"),
+    phone: z.string().regex(/^9\d{8}$/, "Debe ser un celular válido de 9 dígitos"),
     password: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -65,6 +72,12 @@ function RegisterContent() {
         displayName: data.name,
       });
       await ensureUserProfile(userCredential.user);
+      
+      // Save phone number
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        phoneNumber: data.phone
+      }, { merge: true });
+
       router.push(nextPath);
     } catch (e) {
       setError("Error al registrarse. El email podría estar en uso.");
@@ -212,6 +225,25 @@ function RegisterContent() {
             {errors.email && (
               <p className="mt-1 text-xs text-red-500">
                 {errors.email.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Celular (WhatsApp)
+          </label>
+          <div className="mt-1">
+            <input
+              {...register("phone")}
+              type="tel"
+              placeholder="912345678"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
+            />
+            {errors.phone && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.phone.message}
               </p>
             )}
           </div>

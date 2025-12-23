@@ -15,6 +15,8 @@ export interface Product {
   condition: "new" | "used" | "like-new";
   location: string;
   createdAt: Date;
+  reservedAt?: any; // Using any for flexibility with Firestore Timestamp vs Date, or import Timestamp
+  soldAt?: any;
   /**
    * Modo de publicación:
    * - sale: solo venta
