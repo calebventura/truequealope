@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
+import { ImageCarousel } from "@/components/ui/ImageCarousel";
 
 type ModeFilter = "all" | "sale" | "trade";
 
@@ -234,13 +235,17 @@ export default function HomePage() {
                         </div>
                       )}
                       {product.images && product.images.length > 0 ? (
-                        <Image
-                          src={product.images[0]}
-                          alt={product.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-200"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
+                        product.images.length > 1 ? (
+                          <ImageCarousel images={product.images} alt={product.title} />
+                        ) : (
+                          <Image
+                            src={product.images[0]}
+                            alt={product.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-200"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        )
                       ) : (
                         <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800">
                           <span className="text-4xl">

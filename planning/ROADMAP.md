@@ -16,8 +16,9 @@ Este documento describe el plan de implementación para las nuevas funcionalidad
 
 **Enfoque:** Usabilidad en la creación de publicaciones.
 
-- Previsualización de imágenes antes de subir.
-- Selección estandarizada de ubicación (Distritos de Lima y Arequipa).
+- [x] Previsualización de imágenes antes de subir.
+- [x] Selección estandarizada de ubicación (Distritos de Lima y Arequipa).
+- [x] Carrusel de imágenes en listados (Dashboard/Search).
 
 ### [Release 1.2: Flujo de Publicación sin Fricción](./release-1.2-auth-flow/SPECS.md)
 
@@ -29,4 +30,4 @@ Este documento describe el plan de implementación para las nuevas funcionalidad
 
 ---
 
-**Estado Actual:** Planificación. Esperando señal para iniciar Release 1.0.
+**Estado Actual:** Release 1.1 Completado. Listo para iniciar Release 1.2.

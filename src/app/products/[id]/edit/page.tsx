@@ -10,6 +10,7 @@ import { db, auth } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Product } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";
+import { LOCATIONS, Department } from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
 
 const productSchema = z.object({
@@ -32,10 +33,15 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Location State
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
@@ -74,6 +80,21 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           condition: data.condition,
           location: data.location,
         });
+
+        // Parse location
+        if (data.location) {
+          const parts = data.location.split(",").map((s) => s.trim());
+          if (parts.length === 2) {
+            const [dist, dept] = parts;
+            if (Object.keys(LOCATIONS).includes(dept)) {
+              setSelectedDepartment(dept as Department);
+              // Verify district exists in department
+              if (LOCATIONS[dept as Department].includes(dist)) {
+                setSelectedDistrict(dist);
+              }
+            }
+          }
+        }
       } catch (err) {
         console.error(err);
         setError("Error cargando el producto");
@@ -86,6 +107,21 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         fetchProduct();
     }
   }, [productId, user, authLoading, reset, router]);
+
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const dept = e.target.value as Department | "";
+    setSelectedDepartment(dept);
+    setSelectedDistrict("");
+    setValue("location", "", { shouldValidate: true });
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const dist = e.target.value;
+    setSelectedDistrict(dist);
+    if (selectedDepartment && dist) {
+      setValue("location", `${dist}, ${selectedDepartment}`, { shouldValidate: true });
+    }
+  };
 
   const onSubmit = async (data: ProductForm) => {
     setSaving(true);
@@ -175,14 +211,46 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Ubicación</label>
-          <input
-            type="text"
-            {...register("location")}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Departamento</label>
+            <select
+              value={selectedDepartment}
+              onChange={handleDepartmentChange}
+              className="mt-1 block w-full border p-2 rounded-md"
+            >
+              <option value="">Selecciona un departamento</option>
+              {Object.keys(LOCATIONS).map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Distrito</label>
+            <select
+              value={selectedDistrict}
+              onChange={handleDistrictChange}
+              disabled={!selectedDepartment}
+              className="mt-1 block w-full border p-2 rounded-md disabled:opacity-50"
+            >
+              <option value="">Selecciona un distrito</option>
+              {selectedDepartment &&
+                LOCATIONS[selectedDepartment].map((dist) => (
+                  <option key={dist} value={dist}>
+                    {dist}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
+        {/* Hidden input to register location for validation if needed, or just rely on setValue */}
+        {/* We removed the input, so errors.location might not be displayed if we don't add it back or handle it */}
+        {errors.location && (
+            <p className="text-xs text-red-500 mt-1">{errors.location.message}</p>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Descripción</label>

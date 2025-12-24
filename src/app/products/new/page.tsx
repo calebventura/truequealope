@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/storage";
 import { Product, ListingType, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";
+import { LOCATIONS, Department } from "@/lib/locations";
 
 const productSchema = z
   .object({
@@ -85,6 +86,15 @@ export default function NewProductPage() {
   const [uploading, setUploading] = useState(false);
   const [generalError, setGeneralError] = useState("");
 
+  // Image Preview State
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  // Location State
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -104,6 +114,40 @@ export default function NewProductPage() {
 
   const listingType = watch("listingType");
   const acceptedExchangeTypes = watch("acceptedExchangeTypes");
+
+  // Cleanup object URLs
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setSelectedFiles((prev) => {
+        const updated = [...prev, ...newFiles];
+        setValue("images", updated, { shouldValidate: true });
+        return updated;
+      });
+
+      const newUrls = newFiles.map((file) => URL.createObjectURL(file));
+      setPreviewUrls((prev) => [...prev, ...newUrls]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedFiles((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      setValue("images", updated, { shouldValidate: true });
+      return updated;
+    });
+    setPreviewUrls((prev) => {
+      const urlToRemove = prev[index];
+      URL.revokeObjectURL(urlToRemove);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
 
   useEffect(() => {
     // Restaurar borrador si existe (sin imágenes)
@@ -159,6 +203,21 @@ export default function NewProductPage() {
     }
   };
 
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const dept = e.target.value as Department | "";
+    setSelectedDepartment(dept);
+    setSelectedDistrict("");
+    setValue("location", "", { shouldValidate: true });
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const dist = e.target.value;
+    setSelectedDistrict(dist);
+    if (selectedDepartment && dist) {
+      setValue("location", `${dist}, ${selectedDepartment}`, { shouldValidate: true });
+    }
+  };
+
   const onSubmit = async (data: ProductForm) => {
     setGeneralError("");
 
@@ -183,7 +242,8 @@ export default function NewProductPage() {
 
     setUploading(true);
     try {
-      const imageFiles = Array.from(data.images as FileList);
+      // Use selectedFiles directly
+      const imageFiles = selectedFiles;
       const imageUrls: string[] = [];
 
       for (const file of imageFiles) {
@@ -284,25 +344,47 @@ export default function NewProductPage() {
 
             {/* Imágenes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Imágenes
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                {...register("images")}
-                className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md transition-colors
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-full file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-blue-50 file:text-blue-700
-                  dark:file:bg-gray-700 dark:file:text-gray-100
-                  hover:file:bg-blue-100 dark:hover:file:bg-gray-600"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Puedes seleccionar múltiples archivos.
-              </p>
+              
+              <div className="mb-4 grid grid-cols-3 gap-4">
+                {previewUrls.map((url, index) => (
+                  <div key={url} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
+                    <img
+                      src={url}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => setZoomedImage(url)}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeImage(index);
+                      }}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                      aria-label="Eliminar imagen"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                <label className="cursor-pointer flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors">
+                  <span className="text-2xl mb-1">📷</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Agregar</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
               {errors.images && (
                 <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {errors.images.message as string}
@@ -465,22 +547,50 @@ export default function NewProductPage() {
         {step === 3 && (
           <>
             {/* Ubicación */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Ubicación
-              </label>
-              <input
-                type="text"
-                {...register("location")}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-                placeholder="Ej: Palermo, Buenos Aires"
-              />
-              {errors.location && (
-                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
-                  {errors.location.message}
-                </p>
-              )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Departamento
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={handleDepartmentChange}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
+                >
+                  <option value="">Selecciona un departamento</option>
+                  {Object.keys(LOCATIONS).map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Distrito
+                </label>
+                <select
+                  value={selectedDistrict}
+                  onChange={handleDistrictChange}
+                  disabled={!selectedDepartment}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors disabled:opacity-50"
+                >
+                  <option value="">Selecciona un distrito</option>
+                  {selectedDepartment &&
+                    LOCATIONS[selectedDepartment].map((dist) => (
+                      <option key={dist} value={dist}>
+                        {dist}
+                      </option>
+                    ))}
+                </select>
+              </div>
             </div>
+            {errors.location && (
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                {errors.location.message}
+              </p>
+            )}
 
             {/* Descripción */}
             <div>
@@ -533,6 +643,33 @@ export default function NewProductPage() {
           )}
         </div>
       </form>
+
+      {/* Image Zoom Modal */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <img
+              src={zoomedImage}
+              alt="Zoomed preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              type="button"
+              onClick={() => setZoomedImage(null)}
+              className="absolute -top-4 -right-4 bg-white text-black rounded-full p-2 shadow-lg hover:bg-gray-200 transition-colors"
+              aria-label="Cerrar vista previa"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
