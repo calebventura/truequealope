@@ -87,9 +87,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           if (parts.length === 2) {
             const [dist, dept] = parts;
             if (Object.keys(LOCATIONS).includes(dept)) {
-              setSelectedDepartment(dept as Department);
-              // Verify district exists in department
-              if (LOCATIONS[dept as Department].includes(dist)) {
+              const departmentKey = dept as Department;
+              setSelectedDepartment(departmentKey);
+              // Verify district exists in department (cast to string array for TS)
+              const districts = LOCATIONS[departmentKey] as readonly string[];
+              if (districts.includes(dist)) {
                 setSelectedDistrict(dist);
               }
             }

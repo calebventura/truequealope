@@ -747,7 +747,7 @@ function BuyerActivity({ userId }: { userId: string }) {
 }
 
 function ActivityContent() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -769,7 +769,18 @@ function ActivityContent() {
     router.replace(`/activity?${params.toString()}`);
   };
 
-  if (!user) return null;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.replace("/auth/login?next=/activity");
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 transition-colors duration-300">

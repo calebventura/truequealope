@@ -199,11 +199,20 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {filteredProducts.map((product) => {
-              const acceptedTypes = product.acceptedExchangeTypes || (product.mode === 'trade' ? ['product'] : product.mode === 'both' ? ['money', 'product'] : ['money']);
-              const isGiveaway = acceptedTypes.includes('giveaway');
-              const isPermuta = acceptedTypes.includes('exchange');
-              const acceptsMoney = acceptedTypes.includes('money');
-              const acceptsTrade = acceptedTypes.includes('product') || acceptedTypes.includes('service');
+              const acceptedTypes =
+                product.acceptedExchangeTypes ||
+                (product.mode === "trade"
+                  ? ["product"]
+                  : product.mode === "both"
+                  ? ["money", "product"]
+                  : ["money"]);
+              const isGiveaway = acceptedTypes.includes("giveaway");
+              const isPermuta = acceptedTypes.includes("exchange_plus_cash");
+              const acceptsMoney = acceptedTypes.includes("money");
+              const acceptsTrade =
+                acceptedTypes.includes("product") ||
+                acceptedTypes.includes("service") ||
+                acceptedTypes.includes("exchange_plus_cash");
 
               const wantedText =
                 product.wanted && product.wanted.length > 0
