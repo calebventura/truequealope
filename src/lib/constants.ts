@@ -5,6 +5,7 @@ export const CATEGORIES = [
   { id: "sports", name: "Deportes", icon: "⚽" },
   { id: "toys", name: "Juguetes", icon: "🧸" },
   { id: "books", name: "Libros", icon: "📚" },
+  { id: "ex-gift", name: "Regalo de mi ex", icon: "💔" },
   { id: "other", name: "Otros", icon: "🛍️" },
 ];
 

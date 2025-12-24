@@ -15,38 +15,61 @@ import {
 import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/storage";
-import { Product } from "@/types/product";
+import { Product, ListingType, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";
 
 const productSchema = z
   .object({
     title: z.string().min(3, "El título debe tener al menos 3 caracteres"),
     description: z.string().optional(),
-    mode: z.enum(["sale", "trade", "both"] as const, {
-      message: "Selecciona un modo de publicación",
-    }),
-    price: z.number().positive("El precio debe ser mayor a 0").optional(),
+    
+    listingType: z.enum(["product", "service"] as const).default("product"),
+    acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona al menos una opción de intercambio"),
+    exchangeCashDelta: z.number().optional(),
+
+    price: z.number().min(0, "El precio no puede ser negativo").optional(),
     wanted: z.string().optional(),
     categoryId: z.string().min(1, "Selecciona una categoría"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
     location: z.string().min(3, "Ingresa una ubicación válida"),
-    images: z
-      .any()
-      .refine((files) => files?.length > 0, "Debes subir al menos una imagen."),
+    images: z.any().optional(),
   })
   .superRefine((data, ctx) => {
-    if ((data.mode === "sale" || data.mode === "both") && !data.price) {
-      ctx.addIssue({
+    const types = data.acceptedExchangeTypes || [];
+    
+    // Validation for Money or Permuta
+    if ((types.includes("money") || types.includes("exchange_plus_cash")) && (data.price === undefined || data.price === null)) {
+       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["price"],
-        message: "Ingresa un precio",
+        message: "Ingresa un precio o monto referencial",
       });
     }
-    if ((data.mode === "trade" || data.mode === "both") && !data.wanted?.trim()) {
+
+    // Validation for Product/Service exchange
+    if ((types.includes("product") || types.includes("service") || types.includes("exchange_plus_cash")) && !data.wanted?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["wanted"],
-        message: "Ingresa qué buscas a cambio",
+        message: "Describe qué buscas a cambio",
+      });
+    }
+    
+    // Validation for Condition (only for products)
+    if (data.listingType === "product" && !data.condition) {
+        ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["condition"],
+        message: "Selecciona la condición del producto",
+      });
+    }
+
+    // Validation for Images (required for products)
+    if (data.listingType === "product" && (!data.images || data.images.length === 0)) {
+        ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["images"],
+        message: "Debes subir al menos una imagen para un producto.",
       });
     }
   });
@@ -68,16 +91,19 @@ export default function NewProductPage() {
     trigger,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      mode: "sale",
+      listingType: "product",
+      acceptedExchangeTypes: ["money"],
       condition: "used",
     },
   });
 
-  const mode = watch("mode");
+  const listingType = watch("listingType");
+  const acceptedExchangeTypes = watch("acceptedExchangeTypes");
 
   useEffect(() => {
     // Restaurar borrador si existe (sin imágenes)
@@ -103,13 +129,13 @@ export default function NewProductPage() {
 
   const nextStep = async () => {
     if (step === 1) {
-      const ok = await trigger(["images", "title"]);
+      const ok = await trigger(["images", "title", "listingType"]);
       if (ok) setStep(2);
       return;
     }
     if (step === 2) {
       const ok = await trigger([
-        "mode",
+        "acceptedExchangeTypes",
         "price",
         "wanted",
         "categoryId",
@@ -122,6 +148,15 @@ export default function NewProductPage() {
   const prevStep = () => {
     if (step === 2) setStep(1);
     if (step === 3) setStep(2);
+  };
+
+  const handleExchangeTypeChange = (type: ExchangeType, checked: boolean) => {
+    const current = acceptedExchangeTypes || [];
+    if (checked) {
+      setValue("acceptedExchangeTypes", [...current, type]);
+    } else {
+      setValue("acceptedExchangeTypes", current.filter((t) => t !== type));
+    }
   };
 
   const onSubmit = async (data: ProductForm) => {
@@ -163,20 +198,32 @@ export default function NewProductPage() {
           .map((w) => w.trim())
           .filter(Boolean) || [];
 
+      // Determine legacy mode
+      let mode: "sale" | "trade" | "both" = "trade";
+      const hasMoney = data.acceptedExchangeTypes.includes("money");
+      const hasOthers = data.acceptedExchangeTypes.some(t => t !== "money");
+      
+      if (hasMoney && !hasOthers) mode = "sale";
+      else if (hasMoney && hasOthers) mode = "both";
+      else mode = "trade";
+
       const newProduct: Omit<Product, "id"> = {
         sellerId: user.uid,
         title: data.title.trim(),
         description: data.description?.trim() || "",
-        price: data.mode === "trade" ? null : data.price!,
+        price: (hasMoney || data.acceptedExchangeTypes.includes("exchange_plus_cash")) ? data.price : null,
         categoryId: data.categoryId,
-        condition: data.condition ?? "used",
+        condition: data.listingType === "product" ? (data.condition ?? "used") : "new", // Default for service
         location: data.location.trim(),
         images: imageUrls,
         status: "active",
         createdAt: new Date(),
         searchKeywords: data.title.toLowerCase().split(" "),
-        mode: data.mode,
-        wanted: data.mode === "sale" ? [] : wantedItems,
+        mode: mode,
+        wanted: wantedItems,
+        listingType: data.listingType,
+        acceptedExchangeTypes: data.acceptedExchangeTypes,
+        exchangeCashDelta: data.exchangeCashDelta ?? null
       };
 
       await addDoc(collection(db, "products"), {
@@ -216,10 +263,29 @@ export default function NewProductPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {step === 1 && (
           <>
+            {/* Tipo de Publicación */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                ¿Qué vas a publicar?
+              </label>
+              <div className="flex gap-4">
+                <label className={`flex-1 cursor-pointer border rounded-lg p-4 text-center transition-colors ${listingType === 'product' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
+                  <input type="radio" value="product" {...register("listingType")} className="sr-only" />
+                  <span className="block text-2xl mb-1">📦</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Producto</span>
+                </label>
+                <label className={`flex-1 cursor-pointer border rounded-lg p-4 text-center transition-colors ${listingType === 'service' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
+                  <input type="radio" value="service" {...register("listingType")} className="sr-only" />
+                  <span className="block text-2xl mb-1">🛠️</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Servicio</span>
+                </label>
+              </div>
+            </div>
+
             {/* Imágenes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Imágenes del producto
+                Imágenes
               </label>
               <input
                 type="file"
@@ -247,13 +313,13 @@ export default function NewProductPage() {
             {/* Título */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Título
+                Título del {listingType === 'product' ? 'producto' : 'servicio'}
               </label>
               <input
                 type="text"
                 {...register("title")}
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-                placeholder="Ej: Bicicleta de montaña"
+                placeholder={listingType === 'product' ? "Ej: Bicicleta de montaña" : "Ej: Clases de Matemáticas"}
               />
               {errors.title && (
                 <p className="mt-1 text-xs text-red-500 dark:text-red-400">
@@ -266,37 +332,46 @@ export default function NewProductPage() {
 
         {step === 2 && (
           <>
-            {/* Modo */}
+            {/* Tipos de Intercambio */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                ¿Cómo quieres publicarlo?
+                ¿Qué aceptas a cambio?
               </label>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                  <input type="radio" value="sale" {...register("mode")} />
-                  Solo venta
-                </label>
-                <label className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                  <input type="radio" value="trade" {...register("mode")} />
-                  Solo trueque
-                </label>
-                <label className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                  <input type="radio" value="both" {...register("mode")} />
-                  Venta o trueque
-                </label>
+              <div className="space-y-2">
+                {[
+                  { id: 'money', label: 'Dinero (Venta)', icon: '💵' },
+                  { id: 'product', label: 'Otro Producto (Trueque)', icon: '📦' },
+                  { id: 'service', label: 'Servicio (Intercambio)', icon: '🛠️' },
+                  { id: 'exchange_plus_cash', label: 'Permuta (Objeto + Dinero)', icon: '🔄' },
+                  { id: 'giveaway', label: 'Regalo (Gratis)', icon: '🎁' },
+                ].map((type) => (
+                  <label key={type.id} className="flex items-center gap-3 p-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      value={type.id}
+                      checked={acceptedExchangeTypes?.includes(type.id as ExchangeType)}
+                      onChange={(e) => handleExchangeTypeChange(type.id as ExchangeType, e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-xl">{type.icon}</span>
+                    <span className="text-gray-900 dark:text-gray-100">{type.label}</span>
+                  </label>
+                ))}
               </div>
-              {errors.mode && (
+              {errors.acceptedExchangeTypes && (
                 <p className="mt-1 text-xs text-red-500 dark:text-red-400">
-                  {errors.mode.message}
+                  {errors.acceptedExchangeTypes.message}
                 </p>
               )}
             </div>
 
             {/* Precio */}
-            {(mode === "sale" || mode === "both") && (
+            {(acceptedExchangeTypes?.includes("money") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Precio (S/.)
+                  {acceptedExchangeTypes.includes("exchange_plus_cash") && !acceptedExchangeTypes.includes("money") 
+                    ? "Diferencia en dinero (S/.)" 
+                    : "Precio (S/.)"}
                 </label>
                 <input
                   type="number"
@@ -313,19 +388,19 @@ export default function NewProductPage() {
             )}
 
             {/* Busco */}
-            {(mode === "trade" || mode === "both") && (
+            {(acceptedExchangeTypes?.some(t => ['product', 'service', 'exchange_plus_cash'].includes(t))) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Busco a cambio
+                  ¿Qué buscas a cambio?
                 </label>
                 <input
                   type="text"
                   {...register("wanted")}
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-                  placeholder="Ej: consola, tablet, ropa de bebé"
+                  placeholder="Ej: consola, tablet, clases de inglés"
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Puedes separar varias opciones con comas.
+                  Describe lo que te gustaría recibir.
                 </p>
                 {errors.wanted && (
                   <p className="mt-1 text-xs text-red-500 dark:text-red-400">
@@ -359,23 +434,30 @@ export default function NewProductPage() {
                 )}
               </div>
 
-              {/* Condición */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Condición (opcional)
-                </label>
-                <select
-                  {...register("condition")}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
-                >
-                  <option value="">Selecciona el estado</option>
-                  {CONDITIONS.map((cond) => (
-                    <option key={cond.id} value={cond.id}>
-                      {cond.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Condición (Solo Productos) */}
+              {listingType === 'product' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Condición
+                  </label>
+                  <select
+                    {...register("condition")}
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
+                  >
+                    <option value="">Selecciona el estado</option>
+                    {CONDITIONS.map((cond) => (
+                      <option key={cond.id} value={cond.id}>
+                        {cond.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.condition && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      {errors.condition.message}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
@@ -14,6 +14,11 @@ export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -89,7 +94,9 @@ export const Navbar = () => {
               className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
               aria-label="Toggle Dark Mode"
             >
-              {theme === "light" ? (
+              {!mounted ? (
+                <div className="w-5 h-5" />
+              ) : theme === "light" ? (
                 // Moon icon for light mode
                 <svg
                   className="w-5 h-5"

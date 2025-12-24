@@ -198,17 +198,22 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {filteredProducts.map((product) => {
-              const mode = product.mode ?? "sale";
+              const acceptedTypes = product.acceptedExchangeTypes || (product.mode === 'trade' ? ['product'] : product.mode === 'both' ? ['money', 'product'] : ['money']);
+              const isGiveaway = acceptedTypes.includes('giveaway');
+              const isPermuta = acceptedTypes.includes('exchange');
+              const acceptsMoney = acceptedTypes.includes('money');
+              const acceptsTrade = acceptedTypes.includes('product') || acceptedTypes.includes('service');
+
               const wantedText =
                 product.wanted && product.wanted.length > 0
                   ? product.wanted.slice(0, 2).join(", ")
                   : null;
-              const modeBadge =
-                mode === "trade"
-                  ? "Trueque"
-                  : mode === "both"
-                  ? "Venta / Trueque"
-                  : null;
+              
+              let modeBadge = null;
+              if (isGiveaway) modeBadge = "Regalo";
+              else if (isPermuta) modeBadge = "Permuta";
+              else if (acceptsTrade && acceptsMoney) modeBadge = "Venta / Trueque";
+              else if (acceptsTrade) modeBadge = "Trueque";
 
               return (
                 <Link
@@ -237,8 +242,10 @@ export default function HomePage() {
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                       ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
-                          Sin imagen
+                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800">
+                          <span className="text-4xl">
+                            {product.listingType === 'service' ? '🛠️' : '📦'}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -247,17 +254,21 @@ export default function HomePage() {
                         {product.title}
                       </h3>
 
-                      {mode !== "trade" && product.price != null ? (
+                      {isGiveaway ? (
+                        <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">
+                          Gratis
+                        </p>
+                      ) : acceptsMoney && product.price != null ? (
                         <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                          S/. {product.price.toLocaleString()}
+                          {isPermuta ? `S/. ${product.price.toLocaleString()} (Dif.)` : `S/. ${product.price.toLocaleString()}`}
                         </p>
                       ) : (
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
-                          {mode === "trade" ? "Solo trueque" : "Sin precio"}
+                          {acceptsTrade ? "Solo trueque" : "Consultar"}
                         </p>
                       )}
 
-                      {(mode === "trade" || mode === "both") && wantedText && (
+                      {(acceptsTrade || isPermuta) && wantedText && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
                           Busco: {wantedText}
                         </p>
