@@ -16,7 +16,7 @@ import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/storage";
 import { Product, ListingType, ExchangeType } from "@/types/product";
-import { CATEGORIES, CONDITIONS } from "@/lib/constants";
+import { CATEGORIES, CONDITIONS, DRAFT_KEY } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
 
 const productSchema = z
@@ -24,7 +24,7 @@ const productSchema = z
     title: z.string().min(3, "El título debe tener al menos 3 caracteres"),
     description: z.string().optional(),
     
-    listingType: z.enum(["product", "service"] as const).default("product"),
+    listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona al menos una opción de intercambio"),
     exchangeCashDelta: z.number().optional(),
 
@@ -77,7 +77,7 @@ const productSchema = z
 
 type ProductForm = z.infer<typeof productSchema>;
 
-const DRAFT_KEY = "draftProduct";
+
 
 export default function NewProductPage() {
   const { user, loading: authLoading } = useAuth();
@@ -85,6 +85,7 @@ export default function NewProductPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [uploading, setUploading] = useState(false);
   const [generalError, setGeneralError] = useState("");
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // Image Preview State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -155,10 +156,27 @@ export default function NewProductPage() {
     if (draftRaw) {
       try {
         const draft = JSON.parse(draftRaw) as Partial<ProductForm>;
+        
+        // Restore location state
+        if (draft.location) {
+          const parts = draft.location.split(",").map((s) => s.trim());
+          if (parts.length === 2) {
+            const [dist, dept] = parts;
+            if (Object.keys(LOCATIONS).includes(dept)) {
+              setSelectedDepartment(dept as Department);
+              if ((LOCATIONS[dept as Department] as readonly string[]).includes(dist)) {
+                setSelectedDistrict(dist);
+              }
+            }
+          }
+        }
+
         reset({
           ...draft,
           images: undefined,
         });
+
+        setDraftRestored(true);
       } catch {
         // ignore
       }
@@ -313,6 +331,19 @@ export default function NewProductPage() {
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Paso {step} de 3
       </p>
+
+      {draftRestored && (
+        <div className="mb-4 p-3 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-200 rounded-md text-sm transition-colors flex justify-between items-center">
+          <span>Hemos recuperado tu publicación pendiente.</span>
+          <button
+            type="button"
+            onClick={() => setDraftRestored(false)}
+            className="text-xs underline hover:text-blue-800 dark:hover:text-blue-100"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {generalError && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-200 rounded-md text-sm transition-colors">

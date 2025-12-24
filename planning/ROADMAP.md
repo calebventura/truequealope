@@ -24,10 +24,10 @@ Este documento describe el plan de implementación para las nuevas funcionalidad
 
 **Enfoque:** Retención de usuarios no logueados.
 
-- Permitir iniciar el llenado del formulario sin sesión.
-- Persistencia de datos (Draft) durante el flujo de login/registro.
-- Restauración automática de datos al volver.
+- [x] Permitir iniciar el llenado del formulario sin sesión.
+- [x] Persistencia de datos (Draft) durante el flujo de login/registro.
+- [x] Restauración automática de datos al volver.
 
 ---
 
-**Estado Actual:** Release 1.1 Completado. Listo para iniciar Release 1.2.
+**Estado Actual:** Release 1.2 Completado.

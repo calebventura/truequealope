@@ -12,6 +12,7 @@
   4.  Usuario da click en "Publicar".
   5.  Sistema detecta `!user`.
   6.  Sistema guarda datos del form en `localStorage.setItem('product_draft', JSON.stringify(formData))`.
+      - *Nota:* Las imágenes no se guardan en localStorage por limitaciones de espacio y seguridad. El usuario deberá subirlas nuevamente.
   7.  Sistema redirige a `/auth/login?returnUrl=/products/new`.
 
 ## 2. Restauración de Borrador

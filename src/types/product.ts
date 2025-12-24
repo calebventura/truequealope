@@ -37,6 +37,6 @@ export interface Product {
   // Nuevos campos Release 1.0
   listingType?: ListingType;
   acceptedExchangeTypes?: ExchangeType[];
-  exchangeCashDelta?: number; // Diferencia en dinero para permuta
+  exchangeCashDelta?: number | null; // Diferencia en dinero para permuta
 }
 

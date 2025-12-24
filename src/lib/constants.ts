@@ -14,3 +14,5 @@ export const CONDITIONS = [
   { id: "like-new", name: "Como nuevo" },
   { id: "used", name: "Usado" },
 ];
+
+export const DRAFT_KEY = "product_draft";
