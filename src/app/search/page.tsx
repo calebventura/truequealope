@@ -344,7 +344,9 @@ function SearchContent() {
                         </p>
                       ) : acceptsMoney && product.price != null ? (
                         <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                          {isPermuta ? `S/. ${product.price.toLocaleString()} (Dif.)` : `S/. ${product.price.toLocaleString()}`}
+                          {isPermuta
+                            ? `S/. ${product.price.toLocaleString()} (Ref.)`
+                            : `S/. ${product.price.toLocaleString()}`}
                         </p>
                       ) : (
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">

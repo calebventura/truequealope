@@ -164,58 +164,58 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  if (loading || authLoading) return <div className="p-8 text-center">Cargando...</div>;
+  if (loading || authLoading) return <div className="p-8 text-center text-gray-800 dark:text-gray-200">Cargando...</div>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg mt-10">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Editar Producto</h1>
+    <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-md rounded-lg mt-10 transition-colors">
+      <h1 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Editar Producto</h1>
       
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-md text-sm">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Título</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Título</label>
           <input
             type="text"
             {...register("title")}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
           {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title.message}</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Precio (S/.)</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Precio (S/.)</label>
           <input
             type="number"
              step="0.01"
             {...register("price", { valueAsNumber: true })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
         </div>
 
          <div>
-            <label className="block text-sm font-medium text-gray-700">Busco a cambio</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Busco a cambio</label>
             <input
             type="text"
             {...register("wanted")}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
              <div>
-                <label className="block text-sm font-medium text-gray-700">Categoría</label>
-                <select {...register("categoryId")} className="mt-1 block w-full border p-2 rounded-md">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Categoría</label>
+                <select {...register("categoryId")} className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700">Condición</label>
-                <select {...register("condition")} className="mt-1 block w-full border p-2 rounded-md">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Condición</label>
+                <select {...register("condition")} className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                      {CONDITIONS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
             </div>
@@ -223,11 +223,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Departamento</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Departamento</label>
             <select
               value={selectedDepartment}
               onChange={handleDepartmentChange}
-              className="mt-1 block w-full border p-2 rounded-md"
+              className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Selecciona un departamento</option>
               {Object.keys(LOCATIONS).map((dept) => (
@@ -239,12 +239,12 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Distrito</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Distrito</label>
             <select
               value={selectedDistrict}
               onChange={handleDistrictChange}
               disabled={!selectedDepartment}
-              className="mt-1 block w-full border p-2 rounded-md disabled:opacity-50"
+              className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md disabled:opacity-50 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Selecciona un distrito</option>
               {selectedDepartment &&
@@ -263,7 +263,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         )}
 
         <div className="border border-gray-200 rounded-md p-3 space-y-2">
-          <p className="text-sm font-medium text-gray-900">Comunidad (opcional)</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Comunidad (opcional)</p>
           <select
             {...register("communityId")}
             className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-sm"
@@ -278,11 +278,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Descripción</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
           <textarea
             {...register("description")}
             rows={4}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
         </div>
 
