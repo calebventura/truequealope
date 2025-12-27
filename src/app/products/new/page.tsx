@@ -35,6 +35,7 @@ const productSchema = z
     wantedProducts: z.string().optional(),
     wantedServices: z.string().optional(),
     wanted: z.string().optional(), // Legacy/Fallback
+    otherCategoryLabel: z.string().optional(),
 
     categoryId: z.string().min(1, "Selecciona una categoría"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
@@ -75,6 +76,14 @@ const productSchema = z
         }
     }
     
+    // Categoria Otros
+    if (data.categoryId === "other") {
+        const otherLabel = data.otherCategoryLabel?.trim();
+        if (!otherLabel || otherLabel.length < 3) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otherCategoryLabel"], message: "Describe la categor¡a (min. 3 caracteres)" });
+        }
+    }
+
     // Validation for Condition (only for products)
     if (data.listingType === "product" && !data.condition) {
         ctx.addIssue({
@@ -131,12 +140,14 @@ export default function NewProductPage() {
       acceptedExchangeTypes: [], // Start empty to force selection
       condition: "used",
       communityId: null,
+      otherCategoryLabel: "",
     },
   });
 
   const listingType = watch("listingType");
   const acceptedExchangeTypes = watch("acceptedExchangeTypes");
   const communityId = watch("communityId");
+  const categoryId = watch("categoryId");
 
   // Cleanup object URLs
   useEffect(() => {
@@ -223,6 +234,7 @@ export default function NewProductPage() {
         "price",
         "wantedProducts",
         "wantedServices",
+        "otherCategoryLabel",
         "categoryId",
         "condition",
       ]);
@@ -317,6 +329,7 @@ export default function NewProductPage() {
       const trimmedWantedServices = data.wantedServices?.trim() || null;
       const sanitizedWantedProducts = trimmedWantedProducts || undefined;
       const sanitizedWantedServices = trimmedWantedServices || undefined;
+      const trimmedOtherCategory = data.otherCategoryLabel?.trim() || null;
       const wantedItems: string[] = [];
       if (trimmedWantedProducts) wantedItems.push(`Productos: ${trimmedWantedProducts}`);
       if (trimmedWantedServices) wantedItems.push(`Servicios: ${trimmedWantedServices}`);
@@ -362,6 +375,8 @@ export default function NewProductPage() {
         ...(sanitizedWantedServices !== undefined
           ? { wantedServices: sanitizedWantedServices }
           : {}),
+        otherCategoryLabel:
+          data.categoryId === "other" ? trimmedOtherCategory || null : null,
       };
 
       await addDoc(collection(db, "products"), {
@@ -640,6 +655,27 @@ export default function NewProductPage() {
                   <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                     {errors.categoryId.message}
                   </p>
+                )}
+                {categoryId === "other" && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Describe la categor¡a
+                    </label>
+                    <input
+                      type="text"
+                      {...register("otherCategoryLabel")}
+                      className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
+                      placeholder="Ej: Repuestos de autos, Manualidades, Antigüedades"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Si no encuentras tu categor¡a, escribe c¢mo la llamar¡as.
+                    </p>
+                    {errors.otherCategoryLabel && (
+                      <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        {errors.otherCategoryLabel.message}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

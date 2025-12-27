@@ -405,6 +405,13 @@ export default function ProductDetailPage() {
   const wantedPreview =
     wantedItems.length > 0 ? wantedItems.join(", ") : null;
 
+  const categoryLabel =
+    product?.categoryId === "other"
+      ? product?.otherCategoryLabel || "Otros"
+      : (product?.categoryId
+          ? CATEGORIES.find((c) => c.id === product.categoryId)?.name
+          : null) || "Otro";
+
   const getModeBadge = () => {
     if (isGiveaway) return "Regalo 🎁";
     if (isPermuta) return "Permuta 🔄";
@@ -576,8 +583,7 @@ export default function ProductDetailPage() {
                       {communityLabel}
                     </span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
-                      {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
-                        "Otro"}
+                      {categoryLabel}
                     </span>
                     {listingType === 'product' && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 capitalize">

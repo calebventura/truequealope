@@ -41,6 +41,10 @@ export interface Product {
    * Descripción específica de servicios buscados (para filtrado).
    */
   wantedServices?: string;
+  /**
+   * Texto libre cuando la categoria elegida es "other".
+   */
+  otherCategoryLabel?: string | null;
   searchKeywords?: string[];
 
   // Nuevos campos Release 1.0

@@ -25,7 +25,7 @@ const productSchema = z.object({
   communityId: z.string().nullable().optional(),
 });
 
-type ProductForm = z.input<typeof productSchema>;
+type ProductForm = z.input<typeof productSchema> & { otherCategoryLabel?: string };
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: productId } = use(params);
@@ -44,10 +44,12 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
   });
+  const categoryId = watch("categoryId");
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -79,10 +81,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           price: data.price ?? undefined,
           wanted: data.wanted?.join(", "),
           categoryId: data.categoryId,
+          otherCategoryLabel: data.otherCategoryLabel ?? "",
           condition: data.condition,
           location: data.location,
           communityId: data.communityId ?? "",
-        });
+        } as ProductForm);
 
         // Parse location
         if (data.location) {
@@ -133,6 +136,12 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     setError("");
 
     const selectedCommunity = data.communityId || null;
+    const trimmedOther = data.otherCategoryLabel?.trim() || "";
+    if (data.categoryId === "other" && trimmedOther.length < 3) {
+        setError("Describe la categoría para 'Otros'.");
+        setSaving(false);
+        return;
+    }
 
     try {
         const token = await user?.getIdToken();
@@ -146,7 +155,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 ...data,
                 visibility: "public",
                 communityId: selectedCommunity,
-                wanted: data.wanted ? data.wanted.split(',').map(s => s.trim()).filter(Boolean) : []
+                wanted: data.wanted ? data.wanted.split(',').map(s => s.trim()).filter(Boolean) : [],
+                otherCategoryLabel: data.categoryId === "other" ? trimmedOther : null,
             })
         });
 
@@ -212,6 +222,20 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 <select {...register("categoryId")} className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {categoryId === "other" && (
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Describe la categor��a</label>
+                    <input
+                      type="text"
+                      {...register("otherCategoryLabel")}
+                      className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      placeholder="Ej: Repuestos de autos, Manualidades"
+                    />
+                    {errors.otherCategoryLabel && (
+                      <p className="text-xs text-red-500 mt-1">{errors.otherCategoryLabel.message}</p>
+                    )}
+                  </div>
+                )}
             </div>
             <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Condición</label>
