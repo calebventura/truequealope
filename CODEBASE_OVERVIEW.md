@@ -84,6 +84,7 @@ La lógica de Firebase está centralizada en `src/lib`.
 - **`orders.ts`:** Funciones para gestionar las órdenes/intercambios en Firestore.
 - **`storage.ts`:** Funciones para interactuar con Firebase Storage (subir, descargar imágenes).
 - **`contact.ts`:** Funciones para la lógica de contacto entre usuarios.
+- **`offers.ts`:** Registro de ofertas de permuta (producto/servicio + monto propuesto) antes de abrir WhatsApp.
 - **`firestore.rules` y `storage.rules`:** Definen las reglas de seguridad para la base de datos y el almacenamiento de archivos, respectivamente.
 
 ## 7. Variables de Entorno
@@ -145,6 +146,12 @@ La aplicación estará disponible en `http://localhost:3000`.
 - Comunidades semilla (constantes): Comunidad Rimac, Padres/Madres, Phillips chu joy, Gamers, Estudiantes.
 - Campos de producto: `communityId` opcional (categoría principal). Todas las publicaciones son públicas; `visibility` se fija en `"public"` para compatibilidad.
 - No hay membresías: cualquier usuario puede ver/filtrar cualquier comunidad. La colección `userCommunities` ya no es necesaria para el acceso.
-- Publicación/edición: se puede elegir comunidad (opcional) y categoría secundaria; por defecto queda “público”.
-- Listados (inicio y buscador): primer filtro por comunidad, luego categoría; las cards muestran un badge con la comunidad o “Público”.
+- Publicación/edición: se puede elegir comunidad (opcional) y categoría secundaria; por defecto queda "público".
+- Listados (inicio y buscador): primer filtro por comunidad, luego categoría; las cards muestran un badge con la comunidad o "Público".
+
+## 10. UX de contacto y permuta (resumen)
+- Venta: el mensaje de WhatsApp expresa que el comprador pagará el precio completo.
+- Trueque: el interesado debe escribir qué ofrece antes de contactar; se inyecta en el mensaje.
+- Permuta: el interesado debe ingresar producto/servicio ofrecido y monto; ambos se guardan como oferta (`products/{productId}/offers`) y se usan en el mensaje. El precio se muestra como “Precio referencial total” con tooltip explicativo.
+- Formulario de publicación: en Permuta el vendedor solo define el precio referencial total (sin monto diferencial) y los campos “qué buscas” son requeridos según el tipo de intercambio.
 
