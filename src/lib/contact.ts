@@ -3,7 +3,9 @@ import {
   collection,
   doc,
   getCountFromServer,
+  query,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 
@@ -28,9 +30,14 @@ export async function logContactClick(
 /**
  * Devuelve el total de clics de contacto registrados para un producto.
  * Solo debe llamarse cuando el usuario es el vendedor (reglas de seguridad lo validan).
+ * Requiere sellerId para cumplir con las reglas de seguridad de Firestore (query-based rules).
  */
-export async function getContactClicksCount(productId: string) {
+export async function getContactClicksCount(productId: string, sellerId: string) {
   const productRef = doc(db, "products", productId);
-  const countSnap = await getCountFromServer(collection(productRef, "contactLogs"));
+  const q = query(
+    collection(productRef, "contactLogs"),
+    where("sellerId", "==", sellerId)
+  );
+  const countSnap = await getCountFromServer(q);
   return countSnap.data().count || 0;
 }

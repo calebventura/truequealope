@@ -136,7 +136,7 @@ function SellerActivity({ userId }: { userId: string }) {
         const entries = await Promise.all(
           visibleProducts.map(async (product) => {
             try {
-              const count = await getContactClicksCount(product.id!);
+              const count = await getContactClicksCount(product.id!, userId);
               return [product.id!, count] as const;
             } catch (error) {
               console.error("Error obteniendo clics de contacto:", error);
@@ -318,16 +318,19 @@ function SellerActivity({ userId }: { userId: string }) {
               className="flex flex-col md:flex-row md:items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 gap-4 bg-white dark:bg-gray-800 shadow-sm transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="relative h-16 w-16 flex-shrink-0">
-                  <Image
-                    src={
-                      product.images[0] ||
-                      "https://placehold.co/100x100?text=Imagen"
-                    }
-                    alt={product.title}
-                    fill
-                    className="object-cover rounded-md"
-                  />
+                <div className="relative h-16 w-16 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center overflow-hidden">
+                  {product.images && product.images.length > 0 ? (
+                    <Image
+                      src={product.images[0]}
+                      alt={product.title}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl" role="img" aria-label="icon">
+                      {product.listingType === 'service' ? '🛠️' : '📦'}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">
@@ -744,7 +747,7 @@ function BuyerActivity({ userId }: { userId: string }) {
 }
 
 function ActivityContent() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -766,7 +769,18 @@ function ActivityContent() {
     router.replace(`/activity?${params.toString()}`);
   };
 
-  if (!user) return null;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.replace("/auth/login?next=/activity");
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 transition-colors duration-300">

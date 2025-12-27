@@ -62,7 +62,7 @@ export default function ProductDetailPage() {
     try {
       await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
       if (user.uid === product.sellerId) {
-        const refreshed = await getContactClicksCount(product.id!);
+        const refreshed = await getContactClicksCount(product.id!, product.sellerId);
         setContactClicks(refreshed);
       }
     } catch (error) {
@@ -216,7 +216,7 @@ export default function ProductDetailPage() {
     const fetchContactClicks = async () => {
       if (!product || !user || product.sellerId !== user.uid) return;
       try {
-        const count = await getContactClicksCount(product.id!);
+        const count = await getContactClicksCount(product.id!, product.sellerId);
         setContactClicks(count);
       } catch (error) {
         console.error("Error obteniendo clics de contacto:", error);
@@ -248,26 +248,47 @@ export default function ProductDetailPage() {
     );
   }
 
-  const mode: ProductMode = product.mode ?? "sale";
-  const canSell = mode === "sale" || mode === "both";
-  const canTrade = mode === "trade" || mode === "both";
+  const listingType = product.listingType || 'product';
+  const acceptedTypes = product.acceptedExchangeTypes || [];
+  
+  // Fallback for legacy data
+  if (acceptedTypes.length === 0) {
+      if (product.mode === 'sale') acceptedTypes.push('money');
+      else if (product.mode === 'trade') acceptedTypes.push('product');
+      else if (product.mode === 'both') { acceptedTypes.push('money'); acceptedTypes.push('product'); }
+  }
+
+  const isGiveaway = acceptedTypes.includes('giveaway');
+  const isPermuta = acceptedTypes.includes('exchange_plus_cash');
+  const acceptsMoney = acceptedTypes.includes('money') || isPermuta;
+  const acceptsTrade = acceptedTypes.some(t => ['product', 'service'].includes(t));
+
   const sellerIsOwner = user?.uid === product.sellerId;
   const whatsappDisabled =
     contacting ||
     buying ||
     (user ? sellerLoading || !sellerProfile?.phoneNumber : false);
+  
   const buyDisabled =
     buying ||
     contacting ||
     product.status === "reserved" ||
-    product.price == null;
+    (!isGiveaway && product.price == null);
 
   const wantedItems = product.wanted ?? [];
   const wantedPreview =
     wantedItems.length > 0 ? wantedItems.join(", ") : null;
 
-  const modeBadge =
-    mode === "trade" ? "Trueque" : mode === "both" ? "Venta / Trueque" : null;
+  const getModeBadge = () => {
+      if (isGiveaway) return "Regalo 🎁";
+      if (isPermuta) return "Permuta 🔄";
+      if (acceptsMoney && acceptsTrade) return "Venta / Trueque";
+      if (acceptsMoney) return "Venta";
+      if (acceptsTrade) return "Trueque";
+      return "Consultar";
+  };
+
+  const modeBadge = getModeBadge();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 transition-colors duration-300">
@@ -321,7 +342,7 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
             {/* Galería de imágenes */}
             <div className="p-6 bg-gray-100 dark:bg-gray-800 flex flex-col gap-4 transition-colors">
-              <div className="relative aspect-square w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm transition-colors">
+              <div className="relative aspect-square w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm transition-colors flex items-center justify-center">
                 {selectedImage ? (
                   <Image
                     src={selectedImage}
@@ -331,8 +352,13 @@ export default function ProductDetailPage() {
                     priority
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
-                    Sin imagen
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600">
+                    <span className="text-6xl mb-2">
+                      {listingType === 'service' ? '🛠️' : '📦'}
+                    </span>
+                    <span className="text-sm font-medium">
+                      {listingType === 'service' ? 'Servicio sin imagen' : 'Producto sin imagen'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -375,13 +401,15 @@ export default function ProductDetailPage() {
                       {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
                         "Otro"}
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 capitalize">
-                      {product.condition === "like-new"
-                        ? "Como nuevo"
-                        : product.condition === "new"
-                        ? "Nuevo"
-                        : "Usado"}
-                    </span>
+                    {listingType === 'product' && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 capitalize">
+                        {product.condition === "like-new"
+                          ? "Como nuevo"
+                          : product.condition === "new"
+                          ? "Nuevo"
+                          : "Usado"}
+                      </span>
+                    )}
                     {product.status === "reserved" && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 uppercase">
                         Reservado
@@ -402,17 +430,21 @@ export default function ProductDetailPage() {
                   {product.title}
                 </h1>
 
-                {canSell && product.price != null ? (
+                {isGiveaway ? (
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
+                    GRATIS (Regalo)
+                  </p>
+                ) : acceptsMoney && product.price != null ? (
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-                    S/. {product.price.toLocaleString()}
+                    {isPermuta ? `S/. ${product.price.toLocaleString()} (Diferencia)` : `S/. ${product.price.toLocaleString()}`}
                   </p>
                 ) : (
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    {canTrade ? "Solo trueque" : "Sin precio"}
+                    {acceptsTrade ? "Solo trueque/intercambio" : "Consultar precio"}
                   </p>
                 )}
 
-                {canTrade && wantedPreview && (
+                {(acceptsTrade || isPermuta) && wantedPreview && (
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                       Busco a cambio:
@@ -448,7 +480,7 @@ export default function ProductDetailPage() {
                         </div>
                       ) : (
                         <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800 md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none transition-colors">
-                          {canSell && (
+                          {(acceptsMoney || isGiveaway) && (
                             <button
                               onClick={handleBuy}
                               disabled={buyDisabled}
@@ -473,15 +505,15 @@ export default function ProductDetailPage() {
                               </svg>
                               {buying
                                 ? "Procesando..."
-                                : buyDisabled && product.price == null
+                                : buyDisabled && product.price == null && !isGiveaway
                                 ? "Sin precio"
                                 : product.status === "reserved"
                                 ? "Reservado"
-                                : "Comprar ahora"}
+                                : isGiveaway ? "Lo quiero (Gratis)" : "Comprar ahora"}
                             </button>
                           )}
 
-                          {canSell && !canTrade && (
+                          {acceptsMoney && !acceptsTrade && !isGiveaway && (
                             <button
                               onClick={handleContactSale}
                               disabled={whatsappDisabled}
@@ -506,7 +538,7 @@ export default function ProductDetailPage() {
                             </button>
                           )}
 
-                          {canTrade && (
+                          {(acceptsTrade || isPermuta) && (
                             <button
                               onClick={handleOfferTrade}
                               disabled={whatsappDisabled}

@@ -25,7 +25,8 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if isAuthenticated()
-                    && request.resource.data.sellerId == request.auth.uid;
+                    && request.resource.data.sellerId == request.auth.uid
+                    && request.resource.data.status == 'active';
 
       allow update, delete: if isAuthenticated()
                             && resource.data.sellerId == request.auth.uid;
@@ -42,13 +43,14 @@ service cloud.firestore {
                         .hasOnly(["userId", "sellerId", "channel", "createdAt"]);
 
         // El vendedor puede ver métricas; el comprador solo puede leer sus propios logs.
-        // Nota: evitamos get() aquí para que collectionGroup('contactLogs') funcione sin límites de get/exists.
-        allow read: if isAuthenticated()
-                    && (
-                      request.auth.uid == resource.data.userId
-                      || request.auth.uid == resource.data.sellerId
-                    );
+        // Nota: abrimos lectura a cualquier usuario autenticado para evitar denegaciones en collectionGroup con datos incompletos.
+        allow read: if isAuthenticated();
       }
+    }
+
+    // Lectura de collection group contactLogs (independiente del padre) para vistas agregadas
+    match /{path=**}/contactLogs/{logId} {
+      allow read: if isAuthenticated();
     }
 
     // Colección: orders

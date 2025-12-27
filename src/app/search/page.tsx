@@ -8,6 +8,7 @@ import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
+import { ImageCarousel } from "@/components/ui/ImageCarousel";
 
 type ModeFilter = "all" | "sale" | "trade";
 
@@ -238,17 +239,31 @@ function SearchContent() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => {
-              const mode = product.mode ?? "sale";
+              const acceptedTypes =
+                product.acceptedExchangeTypes ||
+                (product.mode === "trade"
+                  ? ["product"]
+                  : product.mode === "both"
+                  ? ["money", "product"]
+                  : ["money"]);
+              const isGiveaway = acceptedTypes.includes("giveaway");
+              const isPermuta = acceptedTypes.includes("exchange_plus_cash");
+              const acceptsMoney = acceptedTypes.includes("money");
+              const acceptsTrade =
+                acceptedTypes.includes("product") ||
+                acceptedTypes.includes("service") ||
+                acceptedTypes.includes("exchange_plus_cash");
+
               const wantedText =
                 product.wanted && product.wanted.length > 0
                   ? product.wanted.slice(0, 2).join(", ")
                   : null;
-              const modeBadge =
-                mode === "trade"
-                  ? "Trueque"
-                  : mode === "both"
-                  ? "Venta / Trueque"
-                  : null;
+              
+              let modeBadge = null;
+              if (isGiveaway) modeBadge = "Regalo";
+              else if (isPermuta) modeBadge = "Permuta";
+              else if (acceptsTrade && acceptsMoney) modeBadge = "Venta / Trueque";
+              else if (acceptsTrade) modeBadge = "Trueque";
 
               return (
                 <Link
@@ -264,15 +279,21 @@ function SearchContent() {
                         </div>
                       )}
                       {product.images && product.images.length > 0 ? (
-                        <Image
-                          src={product.images[0]}
-                          alt={product.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
+                        product.images.length > 1 ? (
+                          <ImageCarousel images={product.images} alt={product.title} />
+                        ) : (
+                          <Image
+                            src={product.images[0]}
+                            alt={product.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                        )
                       ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
-                          Sin imagen
+                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800">
+                          <span className="text-4xl">
+                            {product.listingType === 'service' ? '🛠️' : '📦'}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -281,17 +302,21 @@ function SearchContent() {
                         {product.title}
                       </h3>
 
-                      {mode !== "trade" && product.price != null ? (
+                      {isGiveaway ? (
+                        <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">
+                          Gratis
+                        </p>
+                      ) : acceptsMoney && product.price != null ? (
                         <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                          S/. {product.price.toLocaleString()}
+                          {isPermuta ? `S/. ${product.price.toLocaleString()} (Dif.)` : `S/. ${product.price.toLocaleString()}`}
                         </p>
                       ) : (
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
-                          {mode === "trade" ? "Solo trueque" : "Sin precio"}
+                          {acceptsTrade ? "Solo trueque" : "Consultar"}
                         </p>
                       )}
 
-                      {(mode === "trade" || mode === "both") && wantedText && (
+                      {(acceptsTrade || isPermuta) && wantedText && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
                           Busco: {wantedText}
                         </p>
