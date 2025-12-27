@@ -55,6 +55,9 @@ function SellerActivity({ userId }: { userId: string }) {
     {}
   );
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [reservedForInputs, setReservedForInputs] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     const fetchPendingOrders = async () => {
@@ -132,6 +135,11 @@ function SellerActivity({ userId }: { userId: string }) {
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(visibleProducts);
+        setReservedForInputs(
+          Object.fromEntries(
+            visibleProducts.map((p) => [p.id!, p.reservedForContact ?? ""])
+          )
+        );
 
         const entries = await Promise.all(
           visibleProducts.map(async (product) => {
@@ -157,7 +165,8 @@ function SellerActivity({ userId }: { userId: string }) {
 
   const handleStatusChange = async (
     productId: string,
-    newStatus: ProductStatus
+    newStatus: ProductStatus,
+    reservedForContact?: string | null
   ) => {
     if (
       !confirm(
@@ -170,7 +179,17 @@ function SellerActivity({ userId }: { userId: string }) {
 
     try {
       const productRef = doc(db, "products", productId);
-      await updateDoc(productRef, { status: newStatus });
+      const updateData: Partial<Product> = { status: newStatus };
+      if (newStatus === "active") {
+        updateData.reservedForContact = null;
+        updateData.reservedForUserId = null;
+      } else if (reservedForContact !== undefined) {
+        updateData.reservedForContact =
+          reservedForContact && reservedForContact.trim().length > 0
+            ? reservedForContact.trim()
+            : null;
+      }
+      await updateDoc(productRef, updateData);
 
       if (newStatus === "deleted") {
         setProducts((prev) => prev.filter((p) => p.id !== productId));
@@ -178,6 +197,9 @@ function SellerActivity({ userId }: { userId: string }) {
         setProducts((prev) =>
           prev.map((p) => (p.id === productId ? { ...p, status: newStatus } : p))
         );
+        if (newStatus === "active") {
+          setReservedForInputs((prev) => ({ ...prev, [productId]: "" }));
+        }
       }
     } catch (error) {
       console.error("Error updating status:", error);
@@ -190,6 +212,40 @@ function SellerActivity({ userId }: { userId: string }) {
       ? p.status === "active" || p.status === "reserved"
       : p.status === "sold"
   );
+
+  const getAcceptedTypes = (product: Product) => {
+    const accepted = product.acceptedExchangeTypes
+      ? [...product.acceptedExchangeTypes]
+      : [];
+    if (accepted.length === 0) {
+      if (product.mode === "sale") accepted.push("money");
+      else if (product.mode === "trade") accepted.push("product");
+      else if (product.mode === "both") {
+        accepted.push("money", "product");
+      }
+    }
+    return accepted;
+  };
+
+  const getSoldLabel = (product: Product) => {
+    const accepted = getAcceptedTypes(product);
+    const isGiveaway = accepted.includes("giveaway");
+    const hasPermuta = accepted.includes("exchange_plus_cash");
+    const hasTrade = accepted.some((t) => t === "product" || t === "service" || t === "exchange_plus_cash");
+    if (isGiveaway) return "DONADO";
+    if (hasPermuta || hasTrade) return "TRUQUEADO";
+    return "VENDIDO";
+  };
+
+  const getActionLabel = (product: Product) => {
+    const accepted = getAcceptedTypes(product);
+    const isGiveaway = accepted.includes("giveaway");
+    const hasPermuta = accepted.includes("exchange_plus_cash");
+    const hasTrade = accepted.some((t) => t === "product" || t === "service" || t === "exchange_plus_cash");
+    if (isGiveaway) return "Donar";
+    if (hasPermuta || hasTrade) return "Truequear";
+    return "Vender";
+  };
 
   return (
     <div>
@@ -349,23 +405,23 @@ function SellerActivity({ userId }: { userId: string }) {
                   <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
                     {product.createdAt.toLocaleDateString()}
                   </p>
-                  <div className="mt-1 md:hidden">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        product.status === "active"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                          : product.status === "reserved"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      {product.status === "active"
-                        ? "Activo"
-                        : product.status === "reserved"
-                        ? "Reservado"
-                        : "Vendido"}
-                    </span>
-                  </div>
+            <div className="mt-1 md:hidden">
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  product.status === "active"
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : product.status === "reserved"
+                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {product.status === "active"
+                  ? "Activo"
+                  : product.status === "reserved"
+                  ? "Reservado"
+                  : getSoldLabel(product)}
+            </span>
+          </div>
                   <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Clics en Contactar:{" "}
                     <span className="font-semibold text-gray-800 dark:text-gray-200">
@@ -393,8 +449,33 @@ function SellerActivity({ userId }: { userId: string }) {
                     ? "Activo"
                     : product.status === "reserved"
                     ? "Reservado"
-                    : "Vendido"}
+                    : getSoldLabel(product)}
                 </span>
+              </div>
+
+              <div className="flex-1 md:flex-none md:w-60 text-sm text-gray-600 dark:text-gray-300">
+                {product.reservedForContact ? (
+                  <p className="mb-1">
+                    <span className="font-semibold">Reservado para:</span>{" "}
+                    {product.reservedForContact}
+                  </p>
+                ) : (
+                  <p className="mb-1 text-gray-500 dark:text-gray-400">
+                    Sin comprador asignado
+                  </p>
+                )}
+                <input
+                  type="text"
+                  value={reservedForInputs[product.id!] ?? ""}
+                  onChange={(e) =>
+                    setReservedForInputs((prev) => ({
+                      ...prev,
+                      [product.id!]: e.target.value,
+                    }))
+                  }
+                  placeholder="Nombre/WhatsApp/Email del comprador"
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-xs focus:border-indigo-500 focus:ring-indigo-500"
+                />
               </div>
 
               <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
@@ -407,7 +488,13 @@ function SellerActivity({ userId }: { userId: string }) {
                     </Link>
                     {product.status === "active" ? (
                       <button
-                        onClick={() => handleStatusChange(product.id!, "reserved")}
+                        onClick={() =>
+                          handleStatusChange(
+                            product.id!,
+                            "reserved",
+                            reservedForInputs[product.id!] ?? product.reservedForContact ?? null
+                          )
+                        }
                         className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-md hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors"
                       >
                         Reservar
@@ -421,10 +508,16 @@ function SellerActivity({ userId }: { userId: string }) {
                       </button>
                     )}
                     <button
-                      onClick={() => handleStatusChange(product.id!, "sold")}
+                      onClick={() =>
+                        handleStatusChange(
+                          product.id!,
+                          "sold",
+                          reservedForInputs[product.id!] ?? product.reservedForContact ?? null
+                        )
+                      }
                       className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                     >
-                      Vendido
+                      {getActionLabel(product)}
                     </button>
                   </>
                 ) : (

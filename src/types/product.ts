@@ -45,6 +45,11 @@ export interface Product {
    * Texto libre cuando la categoria elegida es "other".
    */
   otherCategoryLabel?: string | null;
+  /**
+   * Datos del comprador/reservante (captura opcional).
+   */
+  reservedForUserId?: string | null;
+  reservedForContact?: string | null;
   searchKeywords?: string[];
 
   // Nuevos campos Release 1.0
