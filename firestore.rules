@@ -38,7 +38,7 @@ service cloud.firestore {
                       && request.resource.data.userId == request.auth.uid
                       && request.resource.data.sellerId
                         == get(/databases/$(database)/documents/products/$(productId)).data.sellerId
-                      && request.resource.data.channel in ["whatsapp", "other"]
+                      && request.resource.data.channel in ["whatsapp", "instagram", "other"]
                       && request.resource.data.keys()
                         .hasOnly(["userId", "sellerId", "channel", "createdAt"]);
 

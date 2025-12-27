@@ -28,8 +28,34 @@ export default function ProductDetailPage() {
   const [sellerLoading, setSellerLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [contactClicks, setContactClicks] = useState<number | null>(null);
+  
+  // New state for unified contact logic
+  const [contactIntent, setContactIntent] = useState<'buy' | 'trade'>('buy');
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
-  const openWhatsApp = async (messageText: string) => {
+  // Initialize intent based on product type
+  useEffect(() => {
+    if (product) {
+      const acceptedTypes = product.acceptedExchangeTypes || [];
+      // Fallback legacy logic
+      if (acceptedTypes.length === 0) {
+         if (product.mode === 'trade') setContactIntent('trade');
+         else setContactIntent('buy');
+      } else {
+         // Priority: if trade only, set trade. Else default buy.
+         const hasMoney = acceptedTypes.includes('money') || acceptedTypes.includes('exchange_plus_cash');
+         const hasTrade = acceptedTypes.some(t => ['product', 'service'].includes(t));
+         
+         if (!hasMoney && hasTrade) {
+             setContactIntent('trade');
+         } else {
+             setContactIntent('buy');
+         }
+      }
+    }
+  }, [product]);
+
+  const openWhatsApp = async () => {
     if (!user) {
       router.push(`/auth/login?next=/products/${id}`);
       return;
@@ -76,6 +102,26 @@ export default function ProductDetailPage() {
       messageText
     )}`;
     window.open(waUrl, "_blank");
+  };
+
+  const openInstagram = async () => {
+    if (!user) {
+      router.push(`/auth/login?next=/products/${id}`);
+      return;
+    }
+    if (!product || !sellerProfile?.instagramUser) return;
+
+    setContacting(true);
+    try {
+      await logContactClick(product.id!, user.uid, product.sellerId, "instagram");
+    } catch (error) {
+      console.error("Error registrando clic de contacto instagram:", error);
+    } finally {
+      setContacting(false);
+    }
+
+    const igUrl = `https://instagram.com/${sellerProfile.instagramUser}`;
+    window.open(igUrl, "_blank");
   };
 
   const handleContactSale = () => {
@@ -262,6 +308,7 @@ export default function ProductDetailPage() {
   const isPermuta = acceptedTypes.includes('exchange_plus_cash');
   const acceptsMoney = acceptedTypes.includes('money') || isPermuta;
   const acceptsTrade = acceptedTypes.some(t => ['product', 'service'].includes(t));
+  const isMixed = acceptsMoney && acceptsTrade;
 
   const sellerIsOwner = user?.uid === product.sellerId;
   const whatsappDisabled =
@@ -479,95 +526,106 @@ export default function ProductDetailPage() {
                           </p>
                         </div>
                       ) : (
-                        <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800 md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none transition-colors">
-                          {(acceptsMoney || isGiveaway) && (
-                            <button
-                              onClick={handleBuy}
-                              disabled={buyDisabled}
-                              className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-                                buyDisabled
-                                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                                  : "bg-green-600 dark:bg-green-600 text-white hover:bg-green-700 dark:hover:bg-green-500"
-                              }`}
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                                />
-                              </svg>
-                              {buying
-                                ? "Procesando..."
-                                : buyDisabled && product.price == null && !isGiveaway
-                                ? "Sin precio"
-                                : product.status === "reserved"
-                                ? "Reservado"
-                                : isGiveaway ? "Lo quiero (Gratis)" : "Comprar ahora"}
+                        <div 
+                          className={`fixed bottom-16 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.1)] md:shadow-none transition-transform duration-300 ease-in-out ${isPanelExpanded ? "translate-y-0" : "translate-y-[calc(100%-3.25rem)] md:translate-y-0"}`}
+                        >
+                          {/* Mobile Toggle Header */}
+                          <div 
+                            className="flex h-13 items-center justify-between px-4 py-3 border-b dark:border-gray-800 md:hidden cursor-pointer bg-gray-50 dark:bg-gray-800"
+                            onClick={() => setIsPanelExpanded(!isPanelExpanded)}
+                          >
+                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                              {isPanelExpanded ? "Ocultar acciones" : "Contactar al vendedor"}
+                            </span>
+                            <button className="text-gray-500 dark:text-gray-400 focus:outline-none">
+                              {isPanelExpanded ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                              ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                              )}
                             </button>
-                          )}
+                          </div>
 
-                          {acceptsMoney && !acceptsTrade && !isGiveaway && (
-                            <button
-                              onClick={handleContactSale}
-                              disabled={whatsappDisabled}
-                              className="w-full bg-white dark:bg-gray-800 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                                />
-                              </svg>
-                              {contacting
-                                ? "Abriendo WhatsApp..."
-                                : "Contactar por WhatsApp"}
-                            </button>
-                          )}
+                          <div className="p-4 flex flex-col gap-3">
+                            {/* Intent Selector (Radio Buttons) - Only if mixed */}
+                            {isMixed && (
+                                <div className="flex gap-4 mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="contactIntent" 
+                                            value="buy"
+                                            checked={contactIntent === 'buy'}
+                                            onChange={() => setContactIntent('buy')}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-900 dark:text-gray-100">Pagar precio</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="contactIntent" 
+                                            value="trade"
+                                            checked={contactIntent === 'trade'}
+                                            onChange={() => setContactIntent('trade')}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-900 dark:text-gray-100">Ofrecer trueque</span>
+                                    </label>
+                                </div>
+                            )}
 
-                          {(acceptsTrade || isPermuta) && (
-                            <button
-                              onClick={handleOfferTrade}
-                              disabled={whatsappDisabled}
-                              className="w-full bg-white dark:bg-gray-800 border border-indigo-600 dark:border-indigo-500 text-indigo-700 dark:text-indigo-400 py-3 px-4 rounded-lg font-semibold hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 7h6m0 0V3m0 4L3 6m17 11h-6m0 0v4m0-4l7 1"
-                                />
-                              </svg>
-                              {contacting
-                                ? "Abriendo WhatsApp..."
-                                : "Ofrecer trueque por WhatsApp"}
-                            </button>
-                          )}
+                            {/* Acciones Principales */}
+                            <div className="flex flex-col gap-3">
+                                {/* Botón Comprar (Solo si es Venta y hay precio) */}
+                                {(acceptsMoney || isGiveaway) && contactIntent === 'buy' && (
+                                    <button
+                                    onClick={handleBuy}
+                                    disabled={buyDisabled}
+                                    className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                        buyDisabled
+                                        ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                        : "bg-green-600 dark:bg-green-600 text-white hover:bg-green-700 dark:hover:bg-green-500"
+                                    }`}
+                                    >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                                    {buying
+                                        ? "Procesando..."
+                                        : isGiveaway ? "Lo quiero (Gratis)" : "Comprar ahora"}
+                                    </button>
+                                )}
 
-                          {user && !sellerLoading && !sellerProfile?.phoneNumber && (
-                            <p className="text-xs text-red-600 dark:text-red-400 text-center">
-                              El vendedor aún no cargó su número de WhatsApp.
-                            </p>
-                          )}
+                                {/* Botón Unificado WhatsApp */}
+                                <button
+                                    onClick={openWhatsApp}
+                                    disabled={whatsappDisabled}
+                                    className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                    {contacting
+                                    ? "Abriendo WhatsApp..."
+                                    : contactIntent === 'trade' ? "Ofrecer trueque por WhatsApp" : "Contactar por WhatsApp"}
+                                </button>
+
+                                {/* Botón Instagram */}
+                                {sellerProfile?.instagramUser && (
+                                    <button
+                                    onClick={openInstagram}
+                                    disabled={contacting}
+                                    className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
+                                    Ver perfil de Instagram
+                                    </button>
+                                )}
+                            </div>
+
+                            {user && !sellerLoading && !sellerProfile?.phoneNumber && (
+                                <p className="text-xs text-red-600 dark:text-red-400 text-center">
+                                El vendedor aún no cargó su número de WhatsApp.
+                                </p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </>
