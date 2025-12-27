@@ -55,7 +55,7 @@ export default function ProductDetailPage() {
     }
   }, [product]);
 
-  const openWhatsApp = async () => {
+  const openWhatsApp = async (messageText?: string) => {
     if (!user) {
       router.push(`/auth/login?next=/products/${id}`);
       return;
@@ -84,6 +84,15 @@ export default function ProductDetailPage() {
       return;
     }
 
+    const wantedList =
+      product.wanted && product.wanted.length > 0
+        ? product.wanted.join(", ")
+        : "lo que buscas";
+    const defaultMessage =
+      contactIntent === "trade"
+        ? `Hola, me interesa tu publicaci¢n "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. ¨Te interesa?`
+        : `Hola, vi tu publicaci¢n "${product.title}" en Truequ‚alope. ¨Sigue disponible?`;
+
     setContacting(true);
     try {
       await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
@@ -98,8 +107,9 @@ export default function ProductDetailPage() {
     }
 
     const normalizedPhone = phone.replace(/[^\d]/g, "");
+    const finalMessage = messageText ?? defaultMessage;
     const waUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(
-      messageText
+      finalMessage
     )}`;
     window.open(waUrl, "_blank");
   };
@@ -597,7 +607,7 @@ export default function ProductDetailPage() {
 
                                 {/* Botón Unificado WhatsApp */}
                                 <button
-                                    onClick={openWhatsApp}
+                                    onClick={() => openWhatsApp()}
                                     disabled={whatsappDisabled}
                                     className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
                                 >
@@ -615,7 +625,7 @@ export default function ProductDetailPage() {
                                     className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                     >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
-                                    Ver perfil de Instagram
+                                    Contactar por Instagram
                                     </button>
                                 )}
                             </div>
