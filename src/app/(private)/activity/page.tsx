@@ -343,10 +343,7 @@ function SellerActivity({ userId }: { userId: string }) {
                   </h3>
                   <p className="text-indigo-600 dark:text-indigo-400 font-bold">
                     {product.price != null
-                      ? new Intl.NumberFormat("es-CL", {
-                          style: "currency",
-                          currency: "CLP",
-                        }).format(product.price)
+                      ? `S/. ${product.price.toLocaleString()}`
                       : "Sin precio"}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
