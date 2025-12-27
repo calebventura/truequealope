@@ -32,6 +32,14 @@ export interface Product {
    * Opcional para compatibilidad con publicaciones antiguas.
    */
   wanted?: string[];
+  /**
+   * Descripción específica de productos buscados (para filtrado).
+   */
+  wantedProducts?: string;
+  /**
+   * Descripción específica de servicios buscados (para filtrado).
+   */
+  wantedServices?: string;
   searchKeywords?: string[];
 
   // Nuevos campos Release 1.0

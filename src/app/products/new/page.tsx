@@ -25,11 +25,16 @@ const productSchema = z
     description: z.string().optional(),
     
     listingType: z.enum(["product", "service"] as const),
-    acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona al menos una opción de intercambio"),
+    acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona una opción de intercambio"),
     exchangeCashDelta: z.number().optional(),
 
-    price: z.number().min(0, "El precio no puede ser negativo").optional(),
-    wanted: z.string().optional(),
+    price: z.number().min(0, "El valor no puede ser negativo").optional(),
+    
+    // Separate fields for specific exchange wants
+    wantedProducts: z.string().optional(),
+    wantedServices: z.string().optional(),
+    wanted: z.string().optional(), // Legacy/Fallback
+
     categoryId: z.string().min(1, "Selecciona una categoría"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
     location: z.string().min(3, "Ingresa una ubicación válida"),
@@ -38,22 +43,38 @@ const productSchema = z
   .superRefine((data, ctx) => {
     const types = data.acceptedExchangeTypes || [];
     
-    // Validation for Money or Permuta
-    if ((types.includes("money") || types.includes("exchange_plus_cash")) && (data.price === undefined || data.price === null)) {
-       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["price"],
-        message: "Ingresa un precio o monto referencial",
-      });
+    // 1. Dinero (Solo Venta)
+    if (types.includes("money")) {
+        if (!data.price || data.price <= 0) {
+             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el precio de venta" });
+        }
     }
 
-    // Validation for Product/Service exchange
-    if ((types.includes("product") || types.includes("service") || types.includes("exchange_plus_cash")) && !data.wanted?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["wanted"],
-        message: "Describe qué buscas a cambio",
-      });
+    // 2. Permuta (Mix)
+    if (types.includes("exchange_plus_cash")) {
+        if (!data.price || data.price <= 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el valor total estimado del producto/servicio" });
+        }
+        if (data.exchangeCashDelta === undefined || data.exchangeCashDelta === null || data.exchangeCashDelta < 0) {
+             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["exchangeCashDelta"], message: "Ingresa la diferencia en dinero que esperas recibir" });
+        }
+        
+        // At least one wanted field required for Permuta
+        if (!data.wantedProducts?.trim() && !data.wantedServices?.trim()) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["wantedProducts"], message: "Debes especificar qué artículo o servicio buscas recibir" });
+        }
+    }
+
+    // 3. Trueque Puro (Artículo y/o Servicio)
+    if ((types.includes("product") || types.includes("service")) && !types.includes("exchange_plus_cash")) {
+        
+        if (types.includes("product") && !data.wantedProducts?.trim()) {
+             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["wantedProducts"], message: "Describe qué artículos buscas" });
+        }
+        
+        if (types.includes("service") && !data.wantedServices?.trim()) {
+             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["wantedServices"], message: "Describe qué servicios buscas" });
+        }
     }
     
     // Validation for Condition (only for products)
@@ -108,7 +129,7 @@ export default function NewProductPage() {
     resolver: zodResolver(productSchema),
     defaultValues: {
       listingType: "product",
-      acceptedExchangeTypes: ["money"],
+      acceptedExchangeTypes: [], // Start empty to force selection
       condition: "used",
     },
   });
@@ -199,7 +220,9 @@ export default function NewProductPage() {
       const ok = await trigger([
         "acceptedExchangeTypes",
         "price",
-        "wanted",
+        "exchangeCashDelta",
+        "wantedProducts",
+        "wantedServices",
         "categoryId",
         "condition",
       ]);
@@ -213,12 +236,34 @@ export default function NewProductPage() {
   };
 
   const handleExchangeTypeChange = (type: ExchangeType, checked: boolean) => {
-    const current = acceptedExchangeTypes || [];
+    let current = new Set(acceptedExchangeTypes || []);
+
     if (checked) {
-      setValue("acceptedExchangeTypes", [...current, type]);
+      // Reglas de exclusividad
+      if (type === 'giveaway') {
+        current.clear(); // Regalo borra todo lo demás
+      } else if (type === 'exchange_plus_cash') {
+        current.clear(); // Permuta borra todo lo demás
+      } else if (type === 'money') {
+        current.clear(); // Dinero borra todo lo demás
+      } else {
+        // Si selecciona Producto o Servicio (Trueque puro)
+        // Borramos los exclusivos
+        if (current.has('giveaway')) current.delete('giveaway');
+        if (current.has('exchange_plus_cash')) current.delete('exchange_plus_cash');
+        if (current.has('money')) current.delete('money');
+      }
+      current.add(type);
     } else {
-      setValue("acceptedExchangeTypes", current.filter((t) => t !== type));
+      current.delete(type);
     }
+    
+    // Resetear campos dependientes para limpiar la UI/Estado
+    if (type !== 'exchange_plus_cash' && checked) {
+        setValue("exchangeCashDelta", undefined);
+    }
+
+    setValue("acceptedExchangeTypes", Array.from(current) as ExchangeType[]);
   };
 
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -270,28 +315,31 @@ export default function NewProductPage() {
         imageUrls.push(url);
       }
 
-      const wantedItems =
-        data.wanted
-          ?.split(/[,\n]/)
-          .map((w) => w.trim())
-          .filter(Boolean) || [];
+      // Combine wanted items for legacy support and display
+      const wantedItems: string[] = [];
+      if (data.wantedProducts?.trim()) wantedItems.push(`Productos: ${data.wantedProducts.trim()}`);
+      if (data.wantedServices?.trim()) wantedItems.push(`Servicios: ${data.wantedServices.trim()}`);
 
-      // Determine legacy mode
+      // Determine legacy mode logic (internal use)
       let mode: "sale" | "trade" | "both" = "trade";
-      const hasMoney = data.acceptedExchangeTypes.includes("money");
-      const hasOthers = data.acceptedExchangeTypes.some(t => t !== "money");
-      
-      if (hasMoney && !hasOthers) mode = "sale";
-      else if (hasMoney && hasOthers) mode = "both";
+      if (data.acceptedExchangeTypes.includes("money")) mode = "sale";
+      else if (data.acceptedExchangeTypes.includes("exchange_plus_cash")) mode = "both"; // Permuta is basically both
+      else if (data.acceptedExchangeTypes.includes("giveaway")) mode = "sale"; // Treat as sale 0 price
       else mode = "trade";
 
       const newProduct: Omit<Product, "id"> = {
         sellerId: user.uid,
         title: data.title.trim(),
         description: data.description?.trim() || "",
-        price: (hasMoney || data.acceptedExchangeTypes.includes("exchange_plus_cash")) ? data.price : null,
+        // Price logic:
+        // - Money: price
+        // - Permuta: price (total value)
+        // - Others: null or 0
+        price: (data.acceptedExchangeTypes.includes("money") || data.acceptedExchangeTypes.includes("exchange_plus_cash")) 
+                ? data.price 
+                : 0, 
         categoryId: data.categoryId,
-        condition: data.listingType === "product" ? (data.condition ?? "used") : "new", // Default for service
+        condition: data.listingType === "product" ? (data.condition ?? "used") : "new", 
         location: data.location.trim(),
         images: imageUrls,
         status: "active",
@@ -299,6 +347,9 @@ export default function NewProductPage() {
         searchKeywords: data.title.toLowerCase().split(" "),
         mode: mode,
         wanted: wantedItems,
+        // New fields
+        wantedProducts: data.wantedProducts?.trim(),
+        wantedServices: data.wantedServices?.trim(),
         listingType: data.listingType,
         acceptedExchangeTypes: data.acceptedExchangeTypes,
         exchangeCashDelta: data.exchangeCashDelta ?? null
@@ -363,7 +414,7 @@ export default function NewProductPage() {
                 <label className={`flex-1 cursor-pointer border rounded-lg p-4 text-center transition-colors ${listingType === 'product' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
                   <input type="radio" value="product" {...register("listingType")} className="sr-only" />
                   <span className="block text-2xl mb-1">📦</span>
-                  <span className="font-medium text-gray-900 dark:text-white">Producto</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Artículo</span>
                 </label>
                 <label className={`flex-1 cursor-pointer border rounded-lg p-4 text-center transition-colors ${listingType === 'service' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
                   <input type="radio" value="service" {...register("listingType")} className="sr-only" />
@@ -426,7 +477,7 @@ export default function NewProductPage() {
             {/* Título */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Título del {listingType === 'product' ? 'producto' : 'servicio'}
+                Título del {listingType === 'product' ? 'artículo' : 'servicio'}
               </label>
               <input
                 type="text"
@@ -452,22 +503,27 @@ export default function NewProductPage() {
               </label>
               <div className="space-y-2">
                 {[
-                  { id: 'money', label: 'Dinero (Venta)', icon: '💵' },
-                  { id: 'product', label: 'Otro Producto (Trueque)', icon: '📦' },
-                  { id: 'service', label: 'Servicio (Intercambio)', icon: '🛠️' },
-                  { id: 'exchange_plus_cash', label: 'Permuta (Objeto + Dinero)', icon: '🔄' },
-                  { id: 'giveaway', label: 'Regalo (Gratis)', icon: '🎁' },
+                  { id: 'money', label: 'Dinero (Venta pura)', icon: '💵', desc: 'Solo aceptas efectivo/transferencia.' },
+                  { id: 'product', label: 'Artículo (Trueque)', icon: '📦', desc: 'Cambias por otro objeto.' },
+                  { id: 'service', label: 'Servicio (Trueque)', icon: '🛠️', desc: 'Cambias por un servicio.' },
+                  { id: 'exchange_plus_cash', label: 'Permuta (Mix)', icon: '🔄', desc: 'Artículo/Servicio + diferencia en dinero.' },
+                  { id: 'giveaway', label: 'Regalo', icon: '🎁', desc: 'Lo entregas gratis.' },
                 ].map((type) => (
-                  <label key={type.id} className="flex items-center gap-3 p-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                  <label key={type.id} className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer transition-colors ${acceptedExchangeTypes?.includes(type.id as ExchangeType) ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
                     <input
                       type="checkbox"
                       value={type.id}
                       checked={acceptedExchangeTypes?.includes(type.id as ExchangeType)}
                       onChange={(e) => handleExchangeTypeChange(type.id as ExchangeType, e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="text-xl">{type.icon}</span>
-                    <span className="text-gray-900 dark:text-gray-100">{type.label}</span>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl">{type.icon}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{type.label}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{type.desc}</p>
+                    </div>
                   </label>
                 ))}
               </div>
@@ -478,52 +534,103 @@ export default function NewProductPage() {
               )}
             </div>
 
-            {/* Precio */}
-            {(acceptedExchangeTypes?.includes("money") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {acceptedExchangeTypes.includes("exchange_plus_cash") && !acceptedExchangeTypes.includes("money") 
-                    ? "Diferencia en dinero (S/.)" 
-                    : "Precio (S/.)"}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  {...register("price", { valueAsNumber: true })}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-                />
-                {errors.price && (
-                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
-                    {errors.price.message}
-                  </p>
+            {/* CAMPOS DINÁMICOS SEGÚN SELECCIÓN */}
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                
+                {/* 1. DINERO o PERMUTA -> Pide Valor Total */}
+                {(acceptedExchangeTypes?.includes("money") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Valor Total del {listingType === 'product' ? 'artículo' : 'servicio'} (S/.)
+                    </label>
+                    <input
+                    type="number"
+                    step="0.01"
+                    {...register("price", { valueAsNumber: true })}
+                    placeholder="0.00"
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
+                    />
+                    {errors.price && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        {errors.price.message}
+                    </p>
+                    )}
+                </div>
                 )}
-              </div>
-            )}
 
-            {/* Busco */}
-            {(acceptedExchangeTypes?.some(t => ['product', 'service', 'exchange_plus_cash'].includes(t))) && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  ¿Qué buscas a cambio?
-                </label>
-                <input
-                  type="text"
-                  {...register("wanted")}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-                  placeholder="Ej: consola, tablet, clases de inglés"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Describe lo que te gustaría recibir.
-                </p>
-                {errors.wanted && (
-                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
-                    {errors.wanted.message}
-                  </p>
+                {/* 2. SOLO PERMUTA -> Pide Diferencia */}
+                {acceptedExchangeTypes?.includes("exchange_plus_cash") && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Diferencia en dinero a recibir (S/.)
+                        </label>
+                        <input
+                        type="number"
+                        step="0.01"
+                        {...register("exchangeCashDelta", { valueAsNumber: true })}
+                        placeholder="Ej: 50.00"
+                        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Cuánto dinero pides ADEMÁS del objeto de intercambio.
+                        </p>
+                        {errors.exchangeCashDelta && (
+                        <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                            {errors.exchangeCashDelta.message}
+                        </p>
+                        )}
+                    </div>
                 )}
-              </div>
-            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 3. TRUEQUE DE PRODUCTOS */}
+                {(acceptedExchangeTypes?.includes("product") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        ¿Qué artículos buscas recibir?
+                    </label>
+                    <textarea
+                    rows={3}
+                    {...register("wantedProducts")}
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
+                    placeholder="Ej: Celular, Laptop, Bicicleta..."
+                    />
+                    {errors.wantedProducts && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        {errors.wantedProducts.message}
+                    </p>
+                    )}
+                </div>
+                )}
+
+                {/* 4. TRUEQUE DE SERVICIOS */}
+                {(acceptedExchangeTypes?.includes("service") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        ¿Qué servicios buscas recibir?
+                    </label>
+                    <textarea
+                    rows={3}
+                    {...register("wantedServices")}
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
+                    placeholder="Ej: Clases de inglés, Fontanería, Asesoría legal..."
+                    />
+                    {errors.wantedServices && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        {errors.wantedServices.message}
+                    </p>
+                    )}
+                </div>
+                )}
+
+                {acceptedExchangeTypes?.includes("giveaway") && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-md text-sm">
+                        ✨ Tu publicación aparecerá en la sección de "Regalos" y será gratuita para quien la solicite.
+                    </div>
+                )}
+
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               {/* Categoría */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">

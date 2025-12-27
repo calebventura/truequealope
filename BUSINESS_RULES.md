@@ -57,3 +57,21 @@ Este documento define las reglas de negocio acordadas para el MVP, actualizadas 
 ## 5. Gestión del Vendedor
 
 - **Dashboard:** Debe tener una sección explícita de "Solicitudes Pendientes" para confirmar o rechazar reservas.
+
+## 6. Tipos de Intercambio y Publicación
+
+El sistema soporta 5 modalidades de publicación con reglas de exclusividad y datos específicos:
+
+| Opción | Definición | Reglas de Validación | Datos Requeridos |
+| :--- | :--- | :--- | :--- |
+| **💵 Dinero** | Venta pura. Solo dinero. | Excluyente con otras opciones. | `price` (Valor Total). |
+| **📦 Artículo** | Trueque puro (Objeto x Objeto). | Compatible con Servicio. Incompatible con Dinero/Permuta/Regalo. | `wantedProducts` (Qué busca). |
+| **🛠️ Servicio** | Trueque puro (Servicio x Servicio). | Compatible con Artículo. Incompatible con Dinero/Permuta/Regalo. | `wantedServices` (Qué busca). |
+| **🔄 Permuta** | Mix: Objeto/Servicio + Diferencia en dinero. | Excluyente con otras opciones. Requiere especificar si busca objeto o servicio (o ambos). | `price` (Valor Total), `exchangeCashDelta` (Diferencia a recibir), al menos uno de `wantedProducts` o `wantedServices`. |
+| **🎁 Regalo** | Donación. Sin nada a cambio. | Excluyente con todas las opciones. | Ninguno (Precio 0 implícito). |
+
+**Reglas de Interfaz:**
+- Al seleccionar "Permuta", se debe limpiar la selección de "Dinero" o "Regalo".
+- Al seleccionar "Regalo", se limpian todas las demás.
+- "Artículo" y "Servicio" pueden convivir (ej. cambio laptop por tablet O clases de inglés).
+
