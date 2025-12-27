@@ -12,6 +12,7 @@ import { Product } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
+import { COMMUNITIES } from "@/lib/communities";
 
 const productSchema = z.object({
   title: z.string().min(3, "El título debe tener al menos 3 caracteres"),
@@ -21,9 +22,10 @@ const productSchema = z.object({
   categoryId: z.string().min(1, "Selecciona una categoría"),
   condition: z.enum(["new", "like-new", "used"]).optional(),
   location: z.string().min(3, "Ingresa una ubicación válida"),
+  communityId: z.string().nullable().optional(),
 });
 
-type ProductForm = z.infer<typeof productSchema>;
+type ProductForm = z.input<typeof productSchema>;
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: productId } = use(params);
@@ -79,6 +81,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           categoryId: data.categoryId,
           condition: data.condition,
           location: data.location,
+          communityId: data.communityId ?? "",
         });
 
         // Parse location
@@ -128,6 +131,9 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const onSubmit = async (data: ProductForm) => {
     setSaving(true);
     setError("");
+
+    const selectedCommunity = data.communityId || null;
+
     try {
         const token = await user?.getIdToken();
         const res = await fetch(`/api/products/${productId}`, {
@@ -138,6 +144,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             },
             body: JSON.stringify({
                 ...data,
+                visibility: "public",
+                communityId: selectedCommunity,
                 wanted: data.wanted ? data.wanted.split(',').map(s => s.trim()).filter(Boolean) : []
             })
         });
@@ -253,6 +261,21 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         {errors.location && (
             <p className="text-xs text-red-500 mt-1">{errors.location.message}</p>
         )}
+
+        <div className="border border-gray-200 rounded-md p-3 space-y-2">
+          <p className="text-sm font-medium text-gray-900">Comunidad (opcional)</p>
+          <select
+            {...register("communityId")}
+            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-sm"
+          >
+            <option value="">Público (todas las comunidades)</option>
+            {COMMUNITIES.map((community) => (
+              <option key={community.id} value={community.id}>
+                {community.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Descripción</label>

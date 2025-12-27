@@ -28,8 +28,11 @@ service cloud.firestore {
                     && request.resource.data.sellerId == request.auth.uid
                     && request.resource.data.status == 'active';
 
-      allow update, delete: if isAuthenticated()
-                            && resource.data.sellerId == request.auth.uid;
+      allow update: if isAuthenticated()
+                    && resource.data.sellerId == request.auth.uid;
+
+      allow delete: if isAuthenticated()
+                    && resource.data.sellerId == request.auth.uid;
 
       // Registros de clic en "Contactar" (ej. WhatsApp)
       match /contactLogs/{logId} {
@@ -51,6 +54,21 @@ service cloud.firestore {
     // Lectura de collection group contactLogs (independiente del padre) para vistas agregadas
     match /{path=**}/contactLogs/{logId} {
       allow read: if isAuthenticated();
+    }
+
+    // Colección: userCommunities (membresías)
+    match /userCommunities/{membershipId} {
+      allow read: if isAuthenticated()
+                  && request.auth.uid == resource.data.userId;
+
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasOnly(["userId", "communityId", "createdAt"]);
+
+      allow delete: if isAuthenticated()
+                    && resource.data.userId == request.auth.uid;
+
+      allow update: if false;
     }
 
     // Colección: orders

@@ -140,6 +140,11 @@ La aplicación estará disponible en `http://localhost:3000`.
 - **`npm run seed:products`:** (¡CUIDADO!) Inserta datos de prueba en la base de datos de Firestore. Requiere credenciales de administrador.
 - **`npm run seed:cleanup`:** (¡CUIDADO!) Limpia los datos de prueba insertados por el script anterior.
 
-```
+## 9. Comunidades y visibilidad
 
-```
+- Comunidades semilla (constantes): Comunidad Rimac, Padres/Madres, Phillips chu joy, Gamers, Estudiantes.
+- Campos de producto: `communityId` opcional (categoría principal). Todas las publicaciones son públicas; `visibility` se fija en `"public"` para compatibilidad.
+- No hay membresías: cualquier usuario puede ver/filtrar cualquier comunidad. La colección `userCommunities` ya no es necesaria para el acceso.
+- Publicación/edición: se puede elegir comunidad (opcional) y categoría secundaria; por defecto queda “público”.
+- Listados (inicio y buscador): primer filtro por comunidad, luego categoría; las cards muestran un badge con la comunidad o “Público”.
+

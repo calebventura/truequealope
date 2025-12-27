@@ -9,12 +9,18 @@ import { CATEGORIES } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
 import { ImageCarousel } from "@/components/ui/ImageCarousel";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  COMMUNITIES,
+  getCommunityById,
+} from "@/lib/communities";
 
 type ModeFilter = "all" | "sale" | "trade";
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const initialQuery = searchParams.get("q") || "";
   const initialCategory = searchParams.get("category") || "";
@@ -24,6 +30,7 @@ function SearchContent() {
   const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [communityFilter, setCommunityFilter] = useState<string>("all");
 
   useEffect(() => {
     setSearchTerm(searchParams.get("q") || "");
@@ -103,9 +110,17 @@ function SearchContent() {
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, user, authLoading]);
 
-  const filteredProducts = products.filter((product) => {
+  const filteredByCommunity = products.filter((product) => {
+    if (communityFilter === "all") return true;
+    if (communityFilter === "public") {
+      return (product.visibility ?? "public") !== "community";
+    }
+    return product.communityId === communityFilter;
+  });
+
+  const filteredProducts = filteredByCommunity.filter((product) => {
     const mode = product.mode ?? "sale";
     if (modeFilter === "all") return true;
     if (modeFilter === "sale") return mode === "sale" || mode === "both";
@@ -146,6 +161,22 @@ function SearchContent() {
                 {CATEGORIES.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full md:w-56">
+              <select
+                id="community"
+                value={communityFilter}
+                onChange={(e) => setCommunityFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
+              >
+                <option value="all">Todas las comunidades</option>
+                <option value="public">Solo público</option>
+                {COMMUNITIES.map((community) => (
+                  <option key={community.id} value={community.id}>
+                    {community.name}
                   </option>
                 ))}
               </select>
@@ -228,6 +259,7 @@ function SearchContent() {
                   setSearchTerm("");
                   setSelectedCategory("");
                   setModeFilter("all");
+                  setCommunityFilter("all");
                   router.push("/search");
                 }}
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium"
@@ -253,6 +285,10 @@ function SearchContent() {
                 acceptedTypes.includes("product") ||
                 acceptedTypes.includes("service") ||
                 acceptedTypes.includes("exchange_plus_cash");
+              const communityLabel =
+                product.visibility === "community" && product.communityId
+                  ? getCommunityById(product.communityId)?.name ?? "Comunidad privada"
+                  : "Público";
 
               const wantedText =
                 product.wanted && product.wanted.length > 0
@@ -327,7 +363,12 @@ function SearchContent() {
                           {CATEGORIES.find((c) => c.id === product.categoryId)
                             ?.name || "Otro"}
                         </span>
-                        <span>{product.location}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{product.location}</span>
+                          <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-medium">
+                            {communityLabel}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

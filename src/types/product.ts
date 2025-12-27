@@ -1,6 +1,7 @@
 export type ProductMode = "sale" | "trade" | "both";
 export type ListingType = "product" | "service";
 export type ExchangeType = "money" | "product" | "service" | "exchange_plus_cash" | "giveaway";
+export type ProductVisibility = "public" | "community";
 
 export interface Product {
   id?: string;
@@ -46,5 +47,9 @@ export interface Product {
   listingType?: ListingType;
   acceptedExchangeTypes?: ExchangeType[];
   exchangeCashDelta?: number | null; // Diferencia en dinero para permuta
+
+  // Comunidad / visibilidad
+  visibility?: ProductVisibility;
+  communityId?: string | null;
 }
 

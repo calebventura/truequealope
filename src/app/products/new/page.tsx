@@ -18,6 +18,7 @@ import { uploadImage } from "@/lib/storage";
 import { Product, ListingType, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS, DRAFT_KEY } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
+import { COMMUNITIES } from "@/lib/communities";
 
 const productSchema = z
   .object({
@@ -27,6 +28,7 @@ const productSchema = z
     listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona una opción de intercambio"),
     exchangeCashDelta: z.number().optional(),
+    communityId: z.string().nullable().optional(),
 
     price: z.number().min(0, "El valor no puede ser negativo").optional(),
     
@@ -94,9 +96,10 @@ const productSchema = z
         message: "Debes subir al menos una imagen para un producto.",
       });
     }
+
   });
 
-type ProductForm = z.infer<typeof productSchema>;
+type ProductForm = z.input<typeof productSchema>;
 
 
 
@@ -131,11 +134,13 @@ export default function NewProductPage() {
       listingType: "product",
       acceptedExchangeTypes: [], // Start empty to force selection
       condition: "used",
+      communityId: null,
     },
   });
 
   const listingType = watch("listingType");
   const acceptedExchangeTypes = watch("acceptedExchangeTypes");
+  const communityId = watch("communityId");
 
   // Cleanup object URLs
   useEffect(() => {
@@ -303,6 +308,8 @@ export default function NewProductPage() {
       return;
     }
 
+    const selectedCommunity = data.communityId || null;
+
     setUploading(true);
     try {
       // Use selectedFiles directly
@@ -352,7 +359,9 @@ export default function NewProductPage() {
         wantedServices: data.wantedServices?.trim(),
         listingType: data.listingType,
         acceptedExchangeTypes: data.acceptedExchangeTypes,
-        exchangeCashDelta: data.exchangeCashDelta ?? null
+        exchangeCashDelta: data.exchangeCashDelta ?? null,
+        visibility: "public",
+        communityId: selectedCommunity,
       };
 
       await addDoc(collection(db, "products"), {
@@ -541,7 +550,7 @@ export default function NewProductPage() {
                 {(acceptedExchangeTypes?.includes("money") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Valor Total del {listingType === 'product' ? 'artículo' : 'servicio'} (S/.)
+                        Valor Referencial del {listingType === 'product' ? 'artículo' : 'servicio'} (S/.)
                     </label>
                     <input
                     type="number"
@@ -729,6 +738,25 @@ export default function NewProductPage() {
                 {errors.location.message}
               </p>
             )}
+
+            {/* Comunidad (opcional) */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Comunidad (opcional)
+              </label>
+              <select
+                {...register("communityId")}
+                value={communityId ?? ""}
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
+              >
+                <option value="">Público (todas las comunidades)</option>
+                {COMMUNITIES.map((community) => (
+                  <option key={community.id} value={community.id}>
+                    {community.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Descripción */}
             <div>

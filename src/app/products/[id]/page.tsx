@@ -12,6 +12,7 @@ import Link from "next/link";
 import { CATEGORIES } from "@/lib/constants";
 import { logContactClick, getContactClicksCount } from "@/lib/contact";
 import { UserProfile } from "@/types/user";
+import { COMMUNITIES, getCommunityById } from "@/lib/communities";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -49,11 +50,19 @@ export default function ProductDetailPage() {
          if (!hasMoney && hasTrade) {
              setContactIntent('trade');
          } else {
-             setContactIntent('buy');
-         }
+         setContactIntent('buy');
+        }
       }
     }
   }, [product]);
+
+  useEffect(() => {
+    const loadCommunities = async () => {
+      return;
+    };
+
+    void loadCommunities();
+  }, [user]);
 
   const openWhatsApp = async (messageText?: string) => {
     if (!user) {
@@ -218,6 +227,8 @@ export default function ProductDetailPage() {
               ? data.createdAt.toDate()
               : new Date(),
             mode: data.mode ?? "sale",
+            visibility: data.visibility ?? "public",
+            communityId: data.communityId ?? null,
           } as Product;
 
           setProduct(productData);
@@ -321,6 +332,10 @@ export default function ProductDetailPage() {
   const isMixed = acceptsMoney && acceptsTrade;
 
   const sellerIsOwner = user?.uid === product.sellerId;
+  const hasCommunity = !!product.communityId;
+  const communityLabel = product.communityId
+    ? getCommunityById(product.communityId)?.name ?? "Comunidad"
+    : "Público";
   const whatsappDisabled =
     contacting ||
     buying ||
@@ -454,6 +469,15 @@ export default function ProductDetailPage() {
                         {modeBadge}
                       </span>
                     )}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        hasCommunity
+                          ? "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                      }`}
+                    >
+                      {communityLabel}
+                    </span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
                       {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
                         "Otro"}
