@@ -15,6 +15,18 @@ import { UserProfile } from "@/types/user";
 import { COMMUNITIES, getCommunityById } from "@/lib/communities";
 import { createPermutaOffer } from "@/lib/offers";
 
+const resolveProfileDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "object" && "toDate" in value) {
+    const maybeTimestamp = value as { toDate?: () => Date };
+    if (typeof maybeTimestamp.toDate === "function") {
+      return maybeTimestamp.toDate();
+    }
+  }
+  return null;
+};
+
 export default function ProductDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -324,12 +336,6 @@ export default function ProductDetailPage() {
     const fetchSellerProfile = async () => {
       if (!product) return;
 
-      if (!user) {
-        setSellerProfile(null);
-        setSellerLoading(false);
-        return;
-      }
-
       setSellerLoading(true);
       try {
         const sellerDoc = await getDoc(doc(db, "users", product.sellerId));
@@ -411,6 +417,20 @@ export default function ProductDetailPage() {
       : (product?.categoryId
           ? CATEGORIES.find((c) => c.id === product.categoryId)?.name
           : null) || "Otro";
+  const sellerDisplayName = sellerProfile?.displayName || "Vendedor";
+  const sellerPhoto = sellerProfile?.photoURL ?? null;
+  const sellerRating =
+    typeof sellerProfile?.rating === "number" ? sellerProfile.rating : null;
+  const sellerLocation = sellerProfile?.address || null;
+  const sellerCreatedAt = resolveProfileDate(sellerProfile?.createdAt);
+  const sellerSinceLabel = sellerCreatedAt
+    ? sellerCreatedAt.toLocaleDateString()
+    : null;
+  const sellerStatusMessage = sellerLoading
+    ? "Cargando datos del vendedor..."
+    : !sellerProfile
+    ? "Datos del vendedor no disponibles."
+    : null;
 
   const getModeBadge = () => {
     if (isGiveaway) return "Regalo 🎁";
@@ -677,6 +697,80 @@ export default function ProductDetailPage() {
                 <div className="prose prose-sm text-gray-600 dark:text-gray-300 mb-8">
                   <p>{product.description || "Sin descripción."}</p>
                 </div>
+
+                <div className="mb-8 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40 p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="relative h-14 w-14 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-center">
+                        {sellerPhoto ? (
+                          <Image
+                            src={sellerPhoto}
+                            alt={sellerDisplayName}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <svg
+                            className="h-7 w-7 text-gray-400 dark:text-gray-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          Publicado por
+                        </p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {sellerDisplayName}
+                        </p>
+                        {sellerSinceLabel && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Miembro desde {sellerSinceLabel}
+                          </p>
+                        )}
+                        {sellerLocation && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Ubicacion: {sellerLocation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {sellerRating != null && (
+                      <div className="flex items-center gap-2 rounded-full bg-white dark:bg-gray-900 px-3 py-1 text-sm text-gray-700 dark:text-gray-200 shadow-sm">
+                        <svg
+                          className="h-4 w-4 text-yellow-500"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.369 2.449a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.54 1.118L10.5 15.347a1 1 0 00-1.175 0l-3.352 2.429c-.784.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.99 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.957z" />
+                        </svg>
+                        <span className="font-semibold">
+                          {sellerRating.toFixed(1)}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          / 5
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {sellerStatusMessage && (
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                      {sellerStatusMessage}
+                    </p>
+                  )}
+                </div>
+
 
                 <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
                   {!sellerIsOwner ? (

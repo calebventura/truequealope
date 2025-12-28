@@ -86,7 +86,7 @@ La lógica de Firebase está centralizada en `src/lib`.
 - **`contact.ts`:** Funciones para la lógica de contacto entre usuarios.
 - **`offers.ts`:** Registro de ofertas de permuta (producto/servicio + monto propuesto) antes de abrir WhatsApp.
 - **`(private)/activity/page.tsx`:** Dashboard de vendedor con asignación por correo, reservas y cierre de operaciones; usa modales para capturar datos finales según tipo (venta/donación: correo; trueque: correo + ítems; permuta: correo + ítems + monto).
-- **`products/[id]/page.tsx`:** Detalle del producto; muestra resumen de operación final cuando está vendido y refuerza tooltips de precio referencial para permutas.
+- **`products/[id]/page.tsx`:** Detalle del producto; muestra datos del vendedor, resumen de operación final cuando está vendido y refuerza tooltips de precio referencial para permutas.
 - **`firestore.rules` y `storage.rules`:** Definen las reglas de seguridad para la base de datos y el almacenamiento de archivos, respectivamente.
 
 ## 7. Variables de Entorno

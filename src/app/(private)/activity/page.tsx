@@ -24,7 +24,6 @@ import { getContactClicksCount, logContactClick } from "@/lib/contact";
 import { CATEGORIES } from "@/lib/constants";
 
 type ActivityTab = "seller" | "buyer";
-type TabKey = "active" | "history";
 type ProductStatus = "active" | "reserved" | "sold" | "deleted";
 
 type ContactedProduct = {
@@ -51,7 +50,6 @@ function toDate(value: unknown): Date | null {
 function SellerActivity({ userId }: { userId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>("active");
   const [contactCounts, setContactCounts] = useState<Record<string, number>>(
     {}
   );
@@ -144,7 +142,7 @@ function SellerActivity({ userId }: { userId: string }) {
         }) as Product[];
 
         const visibleProducts = productsData
-          .filter((p) => p.status !== "deleted")
+          .filter((p) => p.status !== "deleted" && p.status !== "sold")
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(visibleProducts);
@@ -324,10 +322,8 @@ function SellerActivity({ userId }: { userId: string }) {
       alert("Error al actualizar el estado");
     }
   };
-  const displayedProducts = products.filter((p) =>
-    activeTab === "active"
-      ? p.status === "active" || p.status === "reserved"
-      : p.status === "sold"
+  const displayedProducts = products.filter(
+    (p) => p.status === "active" || p.status === "reserved"
   );
 
   const getAcceptedTypes = (product: Product) => {
@@ -535,10 +531,10 @@ function SellerActivity({ userId }: { userId: string }) {
         <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-              Ventas Realizadas
+              Publicaciones activas
             </dt>
             <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-              {products.filter((p) => p.status === "sold").length}
+              {products.filter((p) => p.status === "active").length}
             </dd>
           </div>
         </div>
@@ -552,31 +548,6 @@ function SellerActivity({ userId }: { userId: string }) {
             </dd>
           </div>
         </div>
-      </div>
-
-      <div className="border-b border-gray-200 dark:border-gray-700 mb-6 transition-colors">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab("active")}
-            className={`${
-              activeTab === "active"
-                ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-          >
-            Activos y Reservados
-          </button>
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`${
-              activeTab === "history"
-                ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-          >
-            Historial de Ventas
-          </button>
-        </nav>
       </div>
 
       {loadingProducts ? (
@@ -597,17 +568,13 @@ function SellerActivity({ userId }: { userId: string }) {
             />
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-            {activeTab === "active"
-              ? "No tienes publicaciones activas"
-              : "No tienes ventas registradas"}
+            No tienes publicaciones activas
           </h3>
-          {activeTab === "active" && (
-            <div className="mt-6">
-              <Link href="/products/new">
-                <Button>Crear primera publicacion</Button>
-              </Link>
-            </div>
-          )}
+          <div className="mt-6">
+            <Link href="/products/new">
+              <Button>Crear primera publicacion</Button>
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

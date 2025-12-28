@@ -6,6 +6,7 @@ export interface UserProfile {
   phoneNumber?: string | null;
   instagramUser?: string | null;
   address?: string | null;
-  createdAt?: Date;
-  updatedAt?: Date;
+  rating?: number | null;
+  createdAt?: Date | { toDate: () => Date } | null;
+  updatedAt?: Date | { toDate: () => Date } | null;
 }

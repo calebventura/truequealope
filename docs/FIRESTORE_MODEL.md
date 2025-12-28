@@ -12,7 +12,10 @@ Almacena la información de perfil de los usuarios (compradores y vendedores).
 | `email` | String | `"juan@email.com"` | Correo electrónico. |
 | `photoURL` | String | `"https://..."` | URL de foto de perfil. |
 | `phoneNumber` | String | `"+54911..."` | Contacto para WhatsApp. |
+| `instagramUser` | String | `"usuario_ig"` | Usuario de Instagram (opcional). |
+| `address` | String | `"Lima, Peru"` | Ubicacion general para coordinar entregas. |
 | `createdAt` | Timestamp | `2023-10-25...` | Fecha de registro. |
+| `updatedAt` | Timestamp | `2023-11-01...` | Fecha de ultima actualizacion del perfil. |
 | `rating` | Number | `4.8` | Promedio de calificaciones (opcional). |
 
 *   **Índices Recomendados:** Ninguno crítico para MVP (búsquedas por ID).
