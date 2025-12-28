@@ -12,6 +12,8 @@ import Link from "next/link";
 import { CATEGORIES } from "@/lib/constants";
 import { logContactClick, getContactClicksCount } from "@/lib/contact";
 import { UserProfile } from "@/types/user";
+import { COMMUNITIES, getCommunityById } from "@/lib/communities";
+import { createPermutaOffer } from "@/lib/offers";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -28,8 +30,51 @@ export default function ProductDetailPage() {
   const [sellerLoading, setSellerLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [contactClicks, setContactClicks] = useState<number | null>(null);
+  const [tradeOfferText, setTradeOfferText] = useState("");
+  const [permutaCashOffer, setPermutaCashOffer] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  
+  // New state for unified contact logic
+  const [contactIntent, setContactIntent] = useState<'buy' | 'trade'>('buy');
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
-  const openWhatsApp = async (messageText: string) => {
+  // Initialize intent based on product type
+  useEffect(() => {
+    if (product) {
+      const acceptedTypes = product.acceptedExchangeTypes || [];
+      // Fallback legacy logic
+      if (acceptedTypes.length === 0) {
+         if (product.mode === 'trade') setContactIntent('trade');
+         else setContactIntent('buy');
+      } else {
+         // Priority: if trade only, set trade. Else default buy.
+         const hasMoney = acceptedTypes.includes('money') || acceptedTypes.includes('exchange_plus_cash');
+         const hasTrade = acceptedTypes.some(t => ['product', 'service'].includes(t));
+         const isPermutaType = acceptedTypes.includes('exchange_plus_cash');
+         
+         if (isPermutaType) {
+             setContactIntent('trade');
+         } else if (!hasMoney && hasTrade) {
+             setContactIntent('trade');
+         } else {
+        setContactIntent('buy');
+       }
+      }
+    }
+  }, [product]);
+
+  useEffect(() => {
+    const loadCommunities = async () => {
+      return;
+    };
+
+    void loadCommunities();
+  }, [user]);
+
+  const openWhatsApp = async (
+    messageText?: string,
+    options?: { beforeLog?: () => Promise<void> }
+  ) => {
     if (!user) {
       router.push(`/auth/login?next=/products/${id}`);
       return;
@@ -58,8 +103,22 @@ export default function ProductDetailPage() {
       return;
     }
 
+    const wantedList =
+      product.wanted && product.wanted.length > 0
+        ? product.wanted.join(", ")
+        : "lo que buscas";
+    const priceText =
+      product.price != null ? ` (S/. ${product.price.toLocaleString()})` : "";
+    const defaultMessage =
+      contactIntent === "trade"
+        ? `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. Te interesa?`
+        : `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?`;
+
     setContacting(true);
     try {
+      if (options?.beforeLog) {
+        await options.beforeLog();
+      }
       await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
       if (user.uid === product.sellerId) {
         const refreshed = await getContactClicksCount(product.id!, product.sellerId);
@@ -72,26 +131,94 @@ export default function ProductDetailPage() {
     }
 
     const normalizedPhone = phone.replace(/[^\d]/g, "");
+    const finalMessage = messageText ?? defaultMessage;
     const waUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(
-      messageText
+      finalMessage
     )}`;
     window.open(waUrl, "_blank");
   };
 
+  const openInstagram = async () => {
+    if (!user) {
+      router.push(`/auth/login?next=/products/${id}`);
+      return;
+    }
+    if (!product || !sellerProfile?.instagramUser) return;
+
+    setContacting(true);
+    try {
+      await logContactClick(product.id!, user.uid, product.sellerId, "instagram");
+    } catch (error) {
+      console.error("Error registrando clic de contacto instagram:", error);
+    } finally {
+      setContacting(false);
+    }
+
+    const igUrl = `https://instagram.com/${sellerProfile.instagramUser}`;
+    window.open(igUrl, "_blank");
+  };
+
+  
   const handleContactSale = () => {
     if (!product) return;
-    const message = `Hola, vi tu publicación "${product.title}" en Truequéalope. ¿Sigue disponible?`;
+    const priceText =
+      product.price != null ? ` (S/. ${product.price.toLocaleString()})` : "";
+    const message = `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?`;
     openWhatsApp(message);
   };
 
-  const handleOfferTrade = () => {
+  const handleContactTrade = () => {
     if (!product) return;
+    const offer = tradeOfferText.trim();
+    if (!offer) {
+      setFormError("Describe que ofreces para el trueque.");
+      return;
+    }
+    setFormError(null);
     const wantedList =
       product.wanted && product.wanted.length > 0
         ? product.wanted.join(", ")
         : "lo que buscas";
-    const message = `Hola, me interesa tu publicación "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. ¿Te interesa?`;
+    const message = `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: ${offer}. Te interesa?`;
     openWhatsApp(message);
+  };
+
+  const handleContactPermuta = async () => {
+    if (!product) return;
+    if (!user) {
+      router.push(`/auth/login?next=/products/${id}`);
+      return;
+    }
+
+    const offer = tradeOfferText.trim();
+    const cashValue = permutaCashOffer.trim();
+    const cash = Number(cashValue);
+
+    if (!offer) {
+      setFormError("Describe el producto o servicio que ofreces.");
+      return;
+    }
+    if (cashValue === "" || Number.isNaN(cash) || cash < 0) {
+      setFormError("Ingresa el monto que quieres pagar (0 o mayor).");
+      return;
+    }
+
+    setFormError(null);
+    const referential =
+      product.price != null ? `S/. ${product.price.toLocaleString()}` : "N/A";
+    const message = `Hola, me interesa permutar tu publicacion "${product.title}". Propongo pagar S/. ${cash.toFixed(2)} y ofrecer: ${offer}. Entiendo que el precio referencial total es ${referential}. Te interesa?`;
+
+    await openWhatsApp(message, {
+      beforeLog: async () => {
+        await createPermutaOffer({
+          productId: product.id!,
+          sellerId: product.sellerId,
+          userId: user.uid,
+          itemOffer: offer,
+          cashOffer: Number(cash.toFixed(2)),
+        });
+      },
+    });
   };
 
   const handleBuy = async () => {
@@ -162,6 +289,8 @@ export default function ProductDetailPage() {
               ? data.createdAt.toDate()
               : new Date(),
             mode: data.mode ?? "sale",
+            visibility: data.visibility ?? "public",
+            communityId: data.communityId ?? null,
           } as Product;
 
           setProduct(productData);
@@ -184,6 +313,12 @@ export default function ProductDetailPage() {
 
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    setTradeOfferText("");
+    setPermutaCashOffer("");
+    setFormError(null);
+  }, [product?.id]);
 
   useEffect(() => {
     const fetchSellerProfile = async () => {
@@ -227,6 +362,88 @@ export default function ProductDetailPage() {
     fetchContactClicks();
   }, [product, user]);
 
+  // Derivados principales (se calculan siempre para no romper el orden de hooks)
+  const listingType = product?.listingType || "product";
+  const acceptedTypes = product?.acceptedExchangeTypes
+    ? [...product.acceptedExchangeTypes]
+    : [];
+
+  if (product && acceptedTypes.length === 0) {
+    if (product.mode === "sale") acceptedTypes.push("money");
+    else if (product.mode === "trade") acceptedTypes.push("product");
+    else if (product.mode === "both") {
+      acceptedTypes.push("money");
+      acceptedTypes.push("product");
+    }
+  }
+
+  const isGiveaway = acceptedTypes.includes("giveaway");
+  const isPermuta = acceptedTypes.includes("exchange_plus_cash");
+  const acceptsMoney = acceptedTypes.includes("money") || isPermuta;
+  const acceptsTrade = acceptedTypes.some((t) =>
+    ["product", "service"].includes(t)
+  );
+  const isMixed = acceptsMoney && acceptsTrade;
+
+  const sellerIsOwner = user?.uid === product?.sellerId;
+  const hasCommunity = !!product?.communityId;
+  const communityLabel = product?.communityId
+    ? getCommunityById(product.communityId)?.name ?? "Comunidad"
+    : "Público";
+  const whatsappDisabled =
+    contacting ||
+    buying ||
+    (user ? sellerLoading || !sellerProfile?.phoneNumber : false);
+
+  const buyDisabled =
+    buying ||
+    contacting ||
+    product?.status === "reserved" ||
+    (!isGiveaway && product?.price == null);
+
+  const wantedItems = product?.wanted ?? [];
+  const wantedPreview =
+    wantedItems.length > 0 ? wantedItems.join(", ") : null;
+
+  const categoryLabel =
+    product?.categoryId === "other"
+      ? product?.otherCategoryLabel || "Otros"
+      : (product?.categoryId
+          ? CATEGORIES.find((c) => c.id === product.categoryId)?.name
+          : null) || "Otro";
+
+  const getModeBadge = () => {
+    if (isGiveaway) return "Regalo 🎁";
+    if (isPermuta) return "Permuta 🔄";
+    if (acceptsMoney && acceptsTrade) return "Venta / Trueque";
+    if (acceptsMoney) return "Venta";
+    if (acceptsTrade) return "Trueque";
+    return "Consultar";
+  };
+
+  const modeBadge = getModeBadge();
+  const showContactIntentSelector = isMixed && !isPermuta;
+  const whatsappAction = isPermuta
+    ? handleContactPermuta
+    : contactIntent === "trade"
+    ? handleContactTrade
+    : handleContactSale;
+  const whatsappLabel = isPermuta
+    ? "Enviar oferta y contactar"
+    : contactIntent === "trade"
+    ? "Ofrecer trueque por WhatsApp"
+    : "Contactar por WhatsApp";
+  const shouldShowTradeFields =
+    isPermuta || (acceptsTrade && contactIntent === "trade");
+  const permutaTooltipText =
+    "Precio referencial total: valor estimado del producto/servicio. Lo que ofreces (producto o servicio) + el monto que propones debe acercarse a este valor.";
+
+  useEffect(() => {
+    if (contactIntent === "buy" && !isPermuta) {
+      setFormError(null);
+    }
+  }, [contactIntent, isPermuta]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -248,47 +465,6 @@ export default function ProductDetailPage() {
     );
   }
 
-  const listingType = product.listingType || 'product';
-  const acceptedTypes = product.acceptedExchangeTypes || [];
-  
-  // Fallback for legacy data
-  if (acceptedTypes.length === 0) {
-      if (product.mode === 'sale') acceptedTypes.push('money');
-      else if (product.mode === 'trade') acceptedTypes.push('product');
-      else if (product.mode === 'both') { acceptedTypes.push('money'); acceptedTypes.push('product'); }
-  }
-
-  const isGiveaway = acceptedTypes.includes('giveaway');
-  const isPermuta = acceptedTypes.includes('exchange_plus_cash');
-  const acceptsMoney = acceptedTypes.includes('money') || isPermuta;
-  const acceptsTrade = acceptedTypes.some(t => ['product', 'service'].includes(t));
-
-  const sellerIsOwner = user?.uid === product.sellerId;
-  const whatsappDisabled =
-    contacting ||
-    buying ||
-    (user ? sellerLoading || !sellerProfile?.phoneNumber : false);
-  
-  const buyDisabled =
-    buying ||
-    contacting ||
-    product.status === "reserved" ||
-    (!isGiveaway && product.price == null);
-
-  const wantedItems = product.wanted ?? [];
-  const wantedPreview =
-    wantedItems.length > 0 ? wantedItems.join(", ") : null;
-
-  const getModeBadge = () => {
-      if (isGiveaway) return "Regalo 🎁";
-      if (isPermuta) return "Permuta 🔄";
-      if (acceptsMoney && acceptsTrade) return "Venta / Trueque";
-      if (acceptsMoney) return "Venta";
-      if (acceptsTrade) return "Trueque";
-      return "Consultar";
-  };
-
-  const modeBadge = getModeBadge();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 transition-colors duration-300">
@@ -397,9 +573,17 @@ export default function ProductDetailPage() {
                         {modeBadge}
                       </span>
                     )}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        hasCommunity
+                          ? "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                      }`}
+                    >
+                      {communityLabel}
+                    </span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
-                      {CATEGORIES.find((c) => c.id === product.categoryId)?.name ||
-                        "Otro"}
+                      {categoryLabel}
                     </span>
                     {listingType === 'product' && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 capitalize">
@@ -435,16 +619,44 @@ export default function ProductDetailPage() {
                     GRATIS (Regalo)
                   </p>
                 ) : acceptsMoney && product.price != null ? (
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-                    {isPermuta ? `S/. ${product.price.toLocaleString()} (Diferencia)` : `S/. ${product.price.toLocaleString()}`}
-                  </p>
+                  <div className="flex flex-col gap-1 mb-2">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {`S/. ${product.price.toLocaleString()}`}
+                    </p>
+                    {isPermuta && (
+                      <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 font-medium">
+                          Precio referencial total
+                        </span>
+                        <div className="relative inline-block group">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4 text-gray-500 dark:text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <div className="absolute z-10 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-md bg-gray-900 text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                            {permutaTooltipText}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     {acceptsTrade ? "Solo trueque/intercambio" : "Consultar precio"}
                   </p>
                 )}
 
-                {(acceptsTrade || isPermuta) && wantedPreview && (
+                {shouldShowTradeFields && wantedPreview && (
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                       Busco a cambio:
@@ -479,95 +691,148 @@ export default function ProductDetailPage() {
                           </p>
                         </div>
                       ) : (
-                        <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800 md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col md:flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none transition-colors">
-                          {(acceptsMoney || isGiveaway) && (
-                            <button
-                              onClick={handleBuy}
-                              disabled={buyDisabled}
-                              className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-                                buyDisabled
-                                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                                  : "bg-green-600 dark:bg-green-600 text-white hover:bg-green-700 dark:hover:bg-green-500"
-                              }`}
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                                />
-                              </svg>
-                              {buying
-                                ? "Procesando..."
-                                : buyDisabled && product.price == null && !isGiveaway
-                                ? "Sin precio"
-                                : product.status === "reserved"
-                                ? "Reservado"
-                                : isGiveaway ? "Lo quiero (Gratis)" : "Comprar ahora"}
+                        <div 
+                          className={`fixed bottom-16 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:static md:p-0 md:bg-transparent md:border-none z-40 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.1)] md:shadow-none transition-transform duration-300 ease-in-out ${isPanelExpanded ? "translate-y-0" : "translate-y-[calc(100%-3.25rem)] md:translate-y-0"}`}
+                        >
+                          {/* Mobile Toggle Header */}
+                          <div 
+                            className="flex h-13 items-center justify-between px-4 py-3 border-b dark:border-gray-800 md:hidden cursor-pointer bg-gray-50 dark:bg-gray-800"
+                            onClick={() => setIsPanelExpanded(!isPanelExpanded)}
+                          >
+                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                              {isPanelExpanded ? "Ocultar acciones" : "Contactar al vendedor"}
+                            </span>
+                            <button className="text-gray-500 dark:text-gray-400 focus:outline-none">
+                              {isPanelExpanded ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                              ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                              )}
                             </button>
-                          )}
+                          </div>
 
-                          {acceptsMoney && !acceptsTrade && !isGiveaway && (
-                            <button
-                              onClick={handleContactSale}
-                              disabled={whatsappDisabled}
-                              className="w-full bg-white dark:bg-gray-800 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                          <div className="p-4 flex flex-col gap-3">
+                            {/* Intent Selector (Radio Buttons) - Only if mixed */}
+                            {showContactIntentSelector && (
+                                <div className="flex gap-4 mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="contactIntent" 
+                                            value="buy"
+                                            checked={contactIntent === 'buy'}
+                                            onChange={() => setContactIntent('buy')}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-900 dark:text-gray-100">Pagar precio</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="contactIntent" 
+                                            value="trade"
+                                            checked={contactIntent === 'trade'}
+                                            onChange={() => setContactIntent('trade')}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-900 dark:text-gray-100">Ofrecer trueque</span>
+                                    </label>
+                                </div>
+                            )}
+
+                            {/* Campos de oferta para trueque / permuta */}
+                            {shouldShowTradeFields && (
+                              <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                  ¿Qué producto o servicio ofreces?
+                                </label>
+                                <textarea
+                                  value={tradeOfferText}
+                                  onChange={(e) => setTradeOfferText(e.target.value)}
+                                  rows={2}
+                                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="Ej: Laptop usada + clases de inglés"
                                 />
-                              </svg>
-                              {contacting
-                                ? "Abriendo WhatsApp..."
-                                : "Contactar por WhatsApp"}
-                            </button>
-                          )}
+                              </div>
+                            )}
 
-                          {(acceptsTrade || isPermuta) && (
-                            <button
-                              onClick={handleOfferTrade}
-                              disabled={whatsappDisabled}
-                              className="w-full bg-white dark:bg-gray-800 border border-indigo-600 dark:border-indigo-500 text-indigo-700 dark:text-indigo-400 py-3 px-4 rounded-lg font-semibold hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 7h6m0 0V3m0 4L3 6m17 11h-6m0 0v4m0-4l7 1"
+                            {isPermuta && (
+                              <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                  Monto que quieres pagar (S/.)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={permutaCashOffer}
+                                  onChange={(e) => setPermutaCashOffer(e.target.value)}
+                                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="Ej: 150.00"
                                 />
-                              </svg>
-                              {contacting
-                                ? "Abriendo WhatsApp..."
-                                : "Ofrecer trueque por WhatsApp"}
-                            </button>
-                          )}
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  Tu oferta (producto/servicio) + el monto deben acercarse al precio referencial total.
+                                </p>
+                              </div>
+                            )}
 
-                          {user && !sellerLoading && !sellerProfile?.phoneNumber && (
-                            <p className="text-xs text-red-600 dark:text-red-400 text-center">
-                              El vendedor aún no cargó su número de WhatsApp.
-                            </p>
-                          )}
+                            {formError && (
+                              <p className="text-xs text-red-600 dark:text-red-400">
+                                {formError}
+                              </p>
+                            )}
+
+                            {/* Acciones Principales */}
+                            <div className="flex flex-col gap-3">
+                                {/* Botón Comprar (Solo si es Venta y hay precio) */}
+                                {(acceptsMoney || isGiveaway) && contactIntent === 'buy' && !isPermuta && (
+                                    <button
+                                    onClick={handleBuy}
+                                    disabled={buyDisabled}
+                                    className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                        buyDisabled
+                                        ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                        : "bg-green-600 dark:bg-green-600 text-white hover:bg-green-700 dark:hover:bg-green-500"
+                                    }`}
+                                    >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                                    {buying
+                                        ? "Procesando..."
+                                        : isGiveaway ? "Lo quiero (Gratis)" : "Comprar ahora"}
+                                    </button>
+                                )}
+
+                                {/* Botón Unificado WhatsApp */}
+                                <button
+                                    onClick={whatsappAction}
+                                    disabled={whatsappDisabled}
+                                    className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                    {contacting
+                                    ? "Abriendo WhatsApp..."
+                                    : whatsappLabel}
+                                </button>
+
+                                {/* Botón Instagram */}
+                                {sellerProfile?.instagramUser && (
+                                    <button
+                                    onClick={openInstagram}
+                                    disabled={contacting}
+                                    className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
+                                    Contactar por Instagram
+                                    </button>
+                                )}
+                            </div>
+
+                            {user && !sellerLoading && !sellerProfile?.phoneNumber && (
+                                <p className="text-xs text-red-600 dark:text-red-400 text-center">
+                                El vendedor aún no cargó su número de WhatsApp.
+                                </p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </>
@@ -579,7 +844,7 @@ export default function ProductDetailPage() {
 
                       <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900 transition-colors">
                         <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          Clics en “Contactar” (WhatsApp)
+                          Clics en "Contactar" (WhatsApp)
                         </p>
                         <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                           {contactClicks !== null ? contactClicks : "—"}
@@ -589,6 +854,57 @@ export default function ProductDetailPage() {
                           WhatsApp.
                         </p>
                       </div>
+
+                      {product.status === "sold" && (
+                        <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                            Detalle de la operación cerrada
+                          </p>
+                          <div className="space-y-1 text-sm text-gray-700 dark:text-gray-200">
+                            <p>
+                              <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                Tipo:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {acceptedTypes.includes("giveaway")
+                                  ? "DONACIÓN"
+                                  : acceptedTypes.includes("exchange_plus_cash") ||
+                                    acceptedTypes.some((t) => t === "product" || t === "service")
+                                  ? "TRUQUEADO"
+                                  : "VENDIDO"}
+                              </span>
+                            </p>
+                            <p>
+                              <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                Usuario:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {product.finalBuyerContact ||
+                                  product.reservedForContact ||
+                                  "No registrado"}
+                              </span>
+                            </p>
+                            {product.finalDealPrice != null && (
+                              <p>
+                                <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                  Monto:{" "}
+                                </span>
+                                <span className="font-medium">
+                                  S/. {product.finalDealPrice.toLocaleString()}
+                                </span>
+                              </p>
+                            )}
+                            {product.finalDealItems && (
+                              <p className="break-words">
+                                <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                  Productos/Servicios:{" "}
+                                </span>
+                                <span className="font-medium">{product.finalDealItems}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <Link
                         href="/activity?tab=seller"

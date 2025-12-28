@@ -466,6 +466,37 @@ function ProfileContent() {
 
                 </div>
 
+                {/* Instagram (Opcional) */}
+                <div className="sm:col-span-3">
+                  <label
+                    htmlFor="instagramUser"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Usuario de Instagram
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 sm:text-sm">@</span>
+                    </div>
+                    <input
+                      type="text"
+                      name="instagramUser"
+                      id="instagramUser"
+                      value={formData.instagramUser || ""}
+                      onChange={(e) => {
+                        // Limpiar input: quitar @, espacios y urls
+                        const val = e.target.value.replace(/@| |https?:\/\/(www\.)?instagram\.com\//g, "");
+                        setFormData({ ...formData, instagramUser: val })
+                      }}
+                      className="block w-full pl-7 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
+                      placeholder="usuario_ig"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Opcional. Se mostrará un botón en tus productos.
+                  </p>
+                </div>
+
   
 
                 {/* Dirección */}
@@ -557,4 +588,3 @@ export default function ProfilePage() {
     </Suspense>
   );
 }
-

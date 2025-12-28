@@ -84,6 +84,9 @@ La lógica de Firebase está centralizada en `src/lib`.
 - **`orders.ts`:** Funciones para gestionar las órdenes/intercambios en Firestore.
 - **`storage.ts`:** Funciones para interactuar con Firebase Storage (subir, descargar imágenes).
 - **`contact.ts`:** Funciones para la lógica de contacto entre usuarios.
+- **`offers.ts`:** Registro de ofertas de permuta (producto/servicio + monto propuesto) antes de abrir WhatsApp.
+- **`(private)/activity/page.tsx`:** Dashboard de vendedor con asignación por correo, reservas y cierre de operaciones; usa modales para capturar datos finales según tipo (venta/donación: correo; trueque: correo + ítems; permuta: correo + ítems + monto).
+- **`products/[id]/page.tsx`:** Detalle del producto; muestra resumen de operación final cuando está vendido y refuerza tooltips de precio referencial para permutas.
 - **`firestore.rules` y `storage.rules`:** Definen las reglas de seguridad para la base de datos y el almacenamiento de archivos, respectivamente.
 
 ## 7. Variables de Entorno
@@ -140,6 +143,19 @@ La aplicación estará disponible en `http://localhost:3000`.
 - **`npm run seed:products`:** (¡CUIDADO!) Inserta datos de prueba en la base de datos de Firestore. Requiere credenciales de administrador.
 - **`npm run seed:cleanup`:** (¡CUIDADO!) Limpia los datos de prueba insertados por el script anterior.
 
-```
+## 9. Comunidades y visibilidad
 
-```
+- Comunidades semilla (constantes): Comunidad Rimac, Padres/Madres, Phillips chu joy, Gamers, Estudiantes.
+- Campos de producto: `communityId` opcional (categoría principal). Todas las publicaciones son públicas; `visibility` se fija en `"public"` para compatibilidad.
+- No hay membresías: cualquier usuario puede ver/filtrar cualquier comunidad. La colección `userCommunities` ya no es necesaria para el acceso.
+- Publicación/edición: se puede elegir comunidad (opcional) y categoría secundaria; por defecto queda "público".
+- Listados (inicio y buscador): primer filtro por comunidad, luego categoría; las cards muestran un badge con la comunidad o "Público".
+- Categoría “Otros”: el formulario de alta y edición obliga a ingresar `otherCategoryLabel` (texto libre). En los listados se etiqueta como “Otros” y en detalle muestra el label personalizado.
+
+## 10. UX de contacto y permuta (resumen)
+- Venta: el mensaje de WhatsApp expresa que el comprador pagará el precio completo.
+- Trueque: el interesado debe escribir qué ofrece antes de contactar; se inyecta en el mensaje.
+- Permuta: el interesado debe ingresar producto/servicio ofrecido y monto; ambos se guardan como oferta (`products/{productId}/offers`) y se usan en el mensaje. El precio se muestra como "Precio referencial total" con tooltip explicativo.
+- Formulario de publicación: en Permuta el vendedor solo define el precio referencial total (sin monto diferencial) y los campos "qué buscas" son requeridos según el tipo de intercambio.
+- Cierre de operaciones en dashboard vendedor: se exige asignar usuario por correo; al marcar vendido se capturan y guardan en el producto los datos finales (`finalBuyerContact`, `finalBuyerUserId`, `finalDealPrice`, `finalDealItems`, `finalizedAt`) y se muestran en historial y detalle.
+

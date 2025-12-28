@@ -28,8 +28,11 @@ service cloud.firestore {
                     && request.resource.data.sellerId == request.auth.uid
                     && request.resource.data.status == 'active';
 
-      allow update, delete: if isAuthenticated()
-                            && resource.data.sellerId == request.auth.uid;
+      allow update: if isAuthenticated()
+                    && resource.data.sellerId == request.auth.uid;
+
+      allow delete: if isAuthenticated()
+                    && resource.data.sellerId == request.auth.uid;
 
       // Registros de clic en "Contactar" (ej. WhatsApp)
       match /contactLogs/{logId} {
@@ -38,7 +41,7 @@ service cloud.firestore {
                       && request.resource.data.userId == request.auth.uid
                       && request.resource.data.sellerId
                         == get(/databases/$(database)/documents/products/$(productId)).data.sellerId
-                      && request.resource.data.channel in ["whatsapp", "other"]
+                      && request.resource.data.channel in ["whatsapp", "instagram", "other"]
                       && request.resource.data.keys()
                         .hasOnly(["userId", "sellerId", "channel", "createdAt"]);
 
@@ -46,11 +49,57 @@ service cloud.firestore {
         // Nota: abrimos lectura a cualquier usuario autenticado para evitar denegaciones en collectionGroup con datos incompletos.
         allow read: if isAuthenticated();
       }
+
+      // Ofertas registradas al contactar por Permuta
+      match /offers/{offerId} {
+        allow create: if isAuthenticated()
+                      && request.resource.data.userId == request.auth.uid
+                      && request.resource.data.sellerId
+                        == get(/databases/$(database)/documents/products/$(productId)).data.sellerId
+                      && request.resource.data.productId == productId
+                      && request.resource.data.type == "permuta"
+                      && request.resource.data.itemOffer is string
+                      && request.resource.data.itemOffer.size() > 0
+                      && request.resource.data.cashOffer is number
+                      && request.resource.data.cashOffer >= 0
+                      && request.resource.data.keys()
+                        .hasOnly([
+                          "userId",
+                          "sellerId",
+                          "productId",
+                          "itemOffer",
+                          "cashOffer",
+                          "type",
+                          "createdAt"
+                        ]);
+
+        // Lectura para vendedor o comprador que envió la oferta
+        allow read: if isAuthenticated()
+                    && (
+                      request.auth.uid == resource.data.sellerId
+                      || request.auth.uid == resource.data.userId
+                    );
+      }
     }
 
     // Lectura de collection group contactLogs (independiente del padre) para vistas agregadas
     match /{path=**}/contactLogs/{logId} {
       allow read: if isAuthenticated();
+    }
+
+    // Colección: userCommunities (membresías)
+    match /userCommunities/{membershipId} {
+      allow read: if isAuthenticated()
+                  && request.auth.uid == resource.data.userId;
+
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasOnly(["userId", "communityId", "createdAt"]);
+
+      allow delete: if isAuthenticated()
+                    && resource.data.userId == request.auth.uid;
+
+      allow update: if false;
     }
 
     // Colección: orders

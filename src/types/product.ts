@@ -1,6 +1,7 @@
 export type ProductMode = "sale" | "trade" | "both";
 export type ListingType = "product" | "service";
 export type ExchangeType = "money" | "product" | "service" | "exchange_plus_cash" | "giveaway";
+export type ProductVisibility = "public" | "community";
 
 export interface Product {
   id?: string;
@@ -32,11 +33,40 @@ export interface Product {
    * Opcional para compatibilidad con publicaciones antiguas.
    */
   wanted?: string[];
+  /**
+   * Descripción específica de productos buscados (para filtrado).
+   */
+  wantedProducts?: string;
+  /**
+   * Descripción específica de servicios buscados (para filtrado).
+   */
+  wantedServices?: string;
+  /**
+   * Texto libre cuando la categoria elegida es "other".
+   */
+  otherCategoryLabel?: string | null;
+  /**
+   * Datos del comprador/reservante (captura opcional).
+   */
+  reservedForUserId?: string | null;
+  reservedForContact?: string | null;
+  /**
+   * Datos de la operación final (venta/trueque/permuta/donación).
+   */
+  finalBuyerUserId?: string | null;
+  finalBuyerContact?: string | null;
+  finalDealPrice?: number | null;
+  finalDealItems?: string | null;
+  finalizedAt?: any;
   searchKeywords?: string[];
 
   // Nuevos campos Release 1.0
   listingType?: ListingType;
   acceptedExchangeTypes?: ExchangeType[];
-  exchangeCashDelta?: number | null; // Diferencia en dinero para permuta
+  exchangeCashDelta?: number | null; // (Deprecated) Diferencia en dinero para permuta; conservado por compatibilidad
+
+  // Comunidad / visibilidad
+  visibility?: ProductVisibility;
+  communityId?: string | null;
 }
 

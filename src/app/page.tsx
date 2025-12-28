@@ -9,6 +9,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { ImageCarousel } from "@/components/ui/ImageCarousel";
+import {
+  COMMUNITIES,
+  getCommunityById,
+} from "@/lib/communities";
 
 type ModeFilter = "all" | "sale" | "trade";
 
@@ -17,9 +21,11 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
+  const [communityFilter, setCommunityFilter] = useState<string>("all");
 
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
       try {
         const q = query(
           collection(db, "products"),
@@ -75,7 +81,15 @@ export default function HomePage() {
     fetchProducts();
   }, [user]);
 
-  const filteredProducts = products.filter((product) => {
+  const communityFiltered = products.filter((product) => {
+    if (communityFilter === "all") return true;
+    if (communityFilter === "public") {
+      return (product.visibility ?? "public") !== "community";
+    }
+    return product.communityId === communityFilter;
+  });
+
+  const filteredProducts = communityFiltered.filter((product) => {
     const mode = product.mode ?? "sale";
     if (modeFilter === "all") return true;
     if (modeFilter === "sale") return mode === "sale" || mode === "both";
@@ -139,11 +153,42 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Header + filtro modo */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Productos recientes
-          </h2>
+        {/* Header + filtros */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Productos recientes
+            </h2>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Filtra por comunidad
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "all", name: "Todas" },
+                  { id: "public", name: "Público" },
+                  ...COMMUNITIES,
+                ].map((community) => {
+                  const active = communityFilter === community.id;
+                  return (
+                    <button
+                      key={community.id}
+                      type="button"
+                      onClick={() => setCommunityFilter(community.id)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        active
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-indigo-400"
+                      }`}
+                    >
+                      {community.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           <div className="inline-flex rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors">
             <button
               type="button"
@@ -181,7 +226,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {filteredProducts.length === 0 ? (
+{filteredProducts.length === 0 ? (
           <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-sm dark:border dark:border-gray-800 transition-colors">
             <p className="text-gray-500 dark:text-gray-400 text-lg">
               No hay productos para este filtro.
@@ -213,6 +258,10 @@ export default function HomePage() {
                 acceptedTypes.includes("product") ||
                 acceptedTypes.includes("service") ||
                 acceptedTypes.includes("exchange_plus_cash");
+              const communityLabel =
+                product.visibility === "community" && product.communityId
+                  ? getCommunityById(product.communityId)?.name ?? "Comunidad privada"
+                  : "Público";
 
               const wantedText =
                 product.wanted && product.wanted.length > 0
@@ -274,7 +323,9 @@ export default function HomePage() {
                         </p>
                       ) : acceptsMoney && product.price != null ? (
                         <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                          {isPermuta ? `S/. ${product.price.toLocaleString()} (Dif.)` : `S/. ${product.price.toLocaleString()}`}
+                          {isPermuta
+                            ? `S/. ${product.price.toLocaleString()} (Ref.)`
+                            : `S/. ${product.price.toLocaleString()}`}
                         </p>
                       ) : (
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
@@ -310,6 +361,9 @@ export default function HomePage() {
                             />
                           </svg>
                           {product.location}
+                        </span>
+                        <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-medium">
+                          {communityLabel}
                         </span>
                       </div>
                     </div>

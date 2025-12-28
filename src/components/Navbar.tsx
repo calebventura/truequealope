@@ -65,7 +65,7 @@ export const Navbar = () => {
               <input
                 name="q"
                 type="text"
-                placeholder="Buscar productos..."
+                placeholder="Buscar artículos..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-base transition-colors"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -175,20 +175,19 @@ export const Navbar = () => {
                       {user.email}
                     </p>
                   </div>
-
-                  <Link
-                    href="/activity?tab=seller"
-                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Mis productos
-                  </Link>
                   <Link
                     href="/products/new"
                     className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Publicar producto
+                    Publicar artículo
+                  </Link>
+                  <Link
+                    href="/activity?tab=seller"
+                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Mi actividad
                   </Link>
                   <Link
                     href="/profile"
@@ -196,13 +195,6 @@ export const Navbar = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Mi perfil
-                  </Link>
-                  <Link
-                    href="/activity?tab=buyer"
-                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Mis compras
                   </Link>
 
                   <button

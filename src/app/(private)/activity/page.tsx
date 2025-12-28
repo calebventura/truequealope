@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -55,6 +56,21 @@ function SellerActivity({ userId }: { userId: string }) {
     {}
   );
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [reservedForInputs, setReservedForInputs] = useState<
+    Record<string, string>
+  >({});
+  const [reservedAssignments, setReservedAssignments] = useState<
+    Record<string, { email: string; userId: string; name?: string | null }>
+  >({});
+  const [dealModal, setDealModal] = useState<{
+    productId: string;
+    type: "sale" | "donation" | "trade" | "permuta";
+    email: string;
+    items: string;
+    price: string;
+  } | null>(null);
+  const [dealModalError, setDealModalError] = useState<string | null>(null);
+  const [dealModalSaving, setDealModalSaving] = useState(false);
 
   useEffect(() => {
     const fetchPendingOrders = async () => {
@@ -132,6 +148,25 @@ function SellerActivity({ userId }: { userId: string }) {
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(visibleProducts);
+        setReservedForInputs(
+          Object.fromEntries(
+            visibleProducts.map((p) => [p.id!, p.reservedForContact ?? ""])
+          )
+        );
+        setReservedAssignments(
+          Object.fromEntries(
+            visibleProducts
+              .filter((p) => p.reservedForUserId && p.reservedForContact)
+              .map((p) => [
+                p.id!,
+                {
+                  email: p.reservedForContact as string,
+                  userId: p.reservedForUserId as string,
+                  name: undefined,
+                },
+              ])
+          )
+        );
 
         const entries = await Promise.all(
           visibleProducts.map(async (product) => {
@@ -157,39 +192,303 @@ function SellerActivity({ userId }: { userId: string }) {
 
   const handleStatusChange = async (
     productId: string,
-    newStatus: ProductStatus
+    newStatus: ProductStatus,
+    options?: {
+      reservedForContact?: string | null;
+      reservedForUserId?: string | null;
+      finalizeData?: {
+        email: string;
+        userId: string;
+        price?: number | null;
+        items?: string | null;
+      };
+    }
   ) => {
-    if (
-      !confirm(
-        `¿Estas seguro de cambiar el estado a ${
-          newStatus === "deleted" ? "ELIMINADO" : newStatus
-        }?`
-      )
-    )
+    const product = products.find((p) => p.id === productId);
+    if (!product) {
+      alert("No pudimos encontrar esta publicacion en tu lista actual.");
       return;
+    }
+
+    const skipConfirm = newStatus === "sold" && options?.finalizeData;
+    if (!skipConfirm) {
+      if (
+        !confirm(
+          `Estas seguro de cambiar el estado a ${
+            newStatus === "deleted" ? "ELIMINADO" : newStatus
+          }?`
+        )
+      )
+        return;
+    }
 
     try {
       const productRef = doc(db, "products", productId);
-      await updateDoc(productRef, { status: newStatus });
+      const updateData: Partial<Product> = { status: newStatus };
+
+      if (newStatus === "active") {
+        updateData.reservedForContact = null;
+        updateData.reservedForUserId = null;
+        updateData.finalBuyerUserId = null;
+        updateData.finalBuyerContact = null;
+        updateData.finalDealPrice = null;
+        updateData.finalDealItems = null;
+        updateData.finalizedAt = null;
+      } else if (options) {
+        if (options.reservedForContact !== undefined) {
+          updateData.reservedForContact =
+            options.reservedForContact && options.reservedForContact.trim().length > 0
+              ? options.reservedForContact.trim()
+              : null;
+        }
+        if (options.reservedForUserId !== undefined) {
+          updateData.reservedForUserId = options.reservedForUserId;
+        }
+      }
+
+      if (newStatus === "sold") {
+        if (!options?.finalizeData?.userId || !options.finalizeData.email) {
+          alert("Debes asignar un correo válido de usuario antes de cerrar la operación.");
+          return;
+        }
+
+        const finalDealPrice =
+          options.finalizeData.price === undefined
+            ? product.price ?? null
+            : options.finalizeData.price;
+
+        updateData.reservedForContact = options.finalizeData.email;
+        updateData.reservedForUserId = options.finalizeData.userId;
+        updateData.finalBuyerUserId = options.finalizeData.userId;
+        updateData.finalBuyerContact = options.finalizeData.email;
+        updateData.finalDealPrice = finalDealPrice ?? null;
+        updateData.finalDealItems = options.finalizeData.items ?? null;
+        updateData.finalizedAt = serverTimestamp();
+      }
+
+      await updateDoc(productRef, updateData);
 
       if (newStatus === "deleted") {
         setProducts((prev) => prev.filter((p) => p.id !== productId));
       } else {
         setProducts((prev) =>
-          prev.map((p) => (p.id === productId ? { ...p, status: newStatus } : p))
+          prev.map((p) =>
+            p.id === productId
+              ? {
+                  ...p,
+                  ...updateData,
+                  reservedForContact: updateData.reservedForContact ?? p.reservedForContact,
+                  reservedForUserId:
+                    updateData.reservedForUserId === undefined
+                      ? p.reservedForUserId
+                      : updateData.reservedForUserId,
+                  finalBuyerContact:
+                    updateData.finalBuyerContact === undefined
+                      ? p.finalBuyerContact
+                      : updateData.finalBuyerContact,
+                  finalBuyerUserId:
+                    updateData.finalBuyerUserId === undefined
+                      ? p.finalBuyerUserId
+                      : updateData.finalBuyerUserId,
+                  finalizedAt:
+                    newStatus === "sold"
+                      ? new Date()
+                      : newStatus === "active"
+                      ? null
+                      : p.finalizedAt,
+                }
+              : p
+          )
         );
+        if (newStatus === "active") {
+          setReservedForInputs((prev) => ({ ...prev, [productId]: "" }));
+        }
+        if (newStatus === "sold" && options?.finalizeData) {
+          const finalizeData = options.finalizeData;
+          setReservedAssignments((prev) => ({
+            ...prev,
+            [productId]: {
+              email: finalizeData.email,
+              userId: finalizeData.userId,
+              name: prev[productId]?.name,
+            },
+          }));
+          setReservedForInputs((prev) => ({
+            ...prev,
+            [productId]: finalizeData.email,
+          }));
+        }
       }
     } catch (error) {
       console.error("Error updating status:", error);
       alert("Error al actualizar el estado");
     }
   };
-
   const displayedProducts = products.filter((p) =>
     activeTab === "active"
       ? p.status === "active" || p.status === "reserved"
       : p.status === "sold"
   );
+
+  const getAcceptedTypes = (product: Product) => {
+    const accepted = product.acceptedExchangeTypes
+      ? [...product.acceptedExchangeTypes]
+      : [];
+    if (accepted.length === 0) {
+      if (product.mode === "sale") accepted.push("money");
+      else if (product.mode === "trade") accepted.push("product");
+      else if (product.mode === "both") {
+        accepted.push("money", "product");
+      }
+    }
+    return accepted;
+  };
+
+  const getDealType = (
+    product: Product
+  ): "sale" | "donation" | "trade" | "permuta" => {
+    const accepted = getAcceptedTypes(product);
+    const isGiveaway = accepted.includes("giveaway");
+    const hasPermuta = accepted.includes("exchange_plus_cash");
+    const hasTrade = accepted.some((t) => t === "product" || t === "service" || t === "exchange_plus_cash");
+    if (isGiveaway) return "donation";
+    if (hasPermuta) return "permuta";
+    if (hasTrade) return "trade";
+    return "sale";
+  };
+
+  const getSoldLabel = (product: Product) => {
+    const type = getDealType(product);
+    if (type === "donation") return "DONADO";
+    if (type === "permuta" || type === "trade") return "TRUQUEADO";
+    return "VENDIDO";
+  };
+
+  const getActionLabel = (product: Product) => {
+    const type = getDealType(product);
+    if (type === "donation") return "Donar";
+    if (type === "permuta" || type === "trade") return "Truequear";
+    return "Vender";
+  };
+
+  const assignUserByEmail = async (productId: string, emailInput: string) => {
+    const email = emailInput.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      alert("Ingresa un correo válido para asignar.");
+      return;
+    }
+    try {
+      const q = query(
+        collection(db, "users"),
+        where("email", "==", email)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        alert("No encontramos un usuario con ese correo.");
+        return;
+      }
+      const userDoc = snap.docs[0];
+      const data = userDoc.data() as { email?: string; displayName?: string };
+      setReservedAssignments((prev) => ({
+        ...prev,
+        [productId]: {
+          email: data.email || email,
+          userId: userDoc.id,
+          name: data.displayName ?? undefined,
+        },
+      }));
+      setReservedForInputs((prev) => ({ ...prev, [productId]: data.email || email }));
+    } catch (e) {
+      console.error("Error buscando usuario:", e);
+      alert("Ocurrió un error al buscar el usuario.");
+    }
+  };
+
+
+  const openFinalizeModal = (product: Product) => {
+    const type = getDealType(product);
+    const preEmail =
+      reservedAssignments[product.id!]?.email ||
+      reservedForInputs[product.id!] ||
+      product.reservedForContact ||
+      "";
+    const pricePrefill =
+      type === "permuta" ? (product.price != null ? String(product.price) : "0") : "";
+
+    setDealModal({
+      productId: product.id!,
+      type,
+      email: preEmail,
+      items: "",
+      price: pricePrefill,
+    });
+    setDealModalError(null);
+    setDealModalSaving(false);
+  };
+
+  const finalizeWithModal = async () => {
+    if (!dealModal) return;
+    setDealModalError(null);
+    setDealModalSaving(true);
+    try {
+      const email = dealModal.email.trim().toLowerCase();
+      if (!email || !email.includes("@")) {
+        setDealModalError("Ingresa un correo válido.");
+        setDealModalSaving(false);
+        return;
+      }
+
+      let userId: string | null = null;
+      try {
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          userId = snap.docs[0].id;
+        }
+      } catch (e) {
+        console.error("Error buscando usuario para finalizar:", e);
+      }
+      if (!userId) {
+        setDealModalError("No encontramos un usuario con ese correo.");
+        setDealModalSaving(false);
+        return;
+      }
+
+      let items: string | null = null;
+      let price: number | null | undefined = undefined;
+
+      if (dealModal.type === "trade" || dealModal.type === "permuta") {
+        if (!dealModal.items.trim()) {
+          setDealModalError("Ingresa el producto o servicio ofrecido.");
+          setDealModalSaving(false);
+          return;
+        }
+        items = dealModal.items.trim();
+      }
+
+      if (dealModal.type === "permuta") {
+        const parsed = Number(dealModal.price);
+        if (Number.isNaN(parsed) || parsed < 0) {
+          setDealModalError("Ingresa un monto válido para la diferencia pagada.");
+          setDealModalSaving(false);
+          return;
+        }
+        price = parsed;
+      }
+
+      await handleStatusChange(dealModal.productId, "sold", {
+        finalizeData: {
+          email,
+          userId,
+          price,
+          items,
+        },
+      });
+      setDealModal(null);
+    } finally {
+      setDealModalSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -343,32 +642,29 @@ function SellerActivity({ userId }: { userId: string }) {
                   </h3>
                   <p className="text-indigo-600 dark:text-indigo-400 font-bold">
                     {product.price != null
-                      ? new Intl.NumberFormat("es-CL", {
-                          style: "currency",
-                          currency: "CLP",
-                        }).format(product.price)
+                      ? `S/. ${product.price.toLocaleString()}`
                       : "Sin precio"}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
                     {product.createdAt.toLocaleDateString()}
                   </p>
-                  <div className="mt-1 md:hidden">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        product.status === "active"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                          : product.status === "reserved"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      {product.status === "active"
-                        ? "Activo"
-                        : product.status === "reserved"
-                        ? "Reservado"
-                        : "Vendido"}
-                    </span>
-                  </div>
+            <div className="mt-1 md:hidden">
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  product.status === "active"
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : product.status === "reserved"
+                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {product.status === "active"
+                  ? "Activo"
+                  : product.status === "reserved"
+                  ? "Reservado"
+                  : getSoldLabel(product)}
+            </span>
+          </div>
                   <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Clics en Contactar:{" "}
                     <span className="font-semibold text-gray-800 dark:text-gray-200">
@@ -396,8 +692,49 @@ function SellerActivity({ userId }: { userId: string }) {
                     ? "Activo"
                     : product.status === "reserved"
                     ? "Reservado"
-                    : "Vendido"}
+                    : getSoldLabel(product)}
                 </span>
+              </div>
+
+              <div className="flex-1 md:flex-none md:w-60 text-sm text-gray-600 dark:text-gray-300">
+                {product.reservedForContact ? (
+                  <p className="mb-1">
+                    <span className="font-semibold">Reservado para:</span>{" "}
+                    {product.reservedForContact}
+                  </p>
+                ) : (
+                  <p className="mb-1 text-gray-500 dark:text-gray-400">
+                    Sin comprador asignado
+                  </p>
+                )}
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="email"
+                    value={reservedForInputs[product.id!] ?? ""}
+                    onChange={(e) =>
+                      setReservedForInputs((prev) => ({
+                        ...prev,
+                        [product.id!]: e.target.value,
+                      }))
+                    }
+                    placeholder="Correo del comprador"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-xs focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      assignUserByEmail(product.id!, reservedForInputs[product.id!] ?? "")
+                    }
+                    className="px-3 py-2 text-xs font-medium bg-indigo-600 text-white rounded-md hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 transition-colors"
+                  >
+                    Asignar
+                  </button>
+                </div>
+                {reservedAssignments[product.id!] && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Asignado a: {reservedAssignments[product.id!].email}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
@@ -410,7 +747,18 @@ function SellerActivity({ userId }: { userId: string }) {
                     </Link>
                     {product.status === "active" ? (
                       <button
-                        onClick={() => handleStatusChange(product.id!, "reserved")}
+                        onClick={() =>
+                          handleStatusChange(
+                            product.id!,
+                            "reserved",
+                            reservedAssignments[product.id!]
+                              ? {
+                                  reservedForContact: reservedAssignments[product.id!].email,
+                                  reservedForUserId: reservedAssignments[product.id!].userId,
+                                }
+                              : undefined
+                          )
+                        }
                         className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-md hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors"
                       >
                         Reservar
@@ -424,10 +772,10 @@ function SellerActivity({ userId }: { userId: string }) {
                       </button>
                     )}
                     <button
-                      onClick={() => handleStatusChange(product.id!, "sold")}
+                      onClick={() => openFinalizeModal(product)}
                       className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                     >
-                      Vendido
+                      {getActionLabel(product)}
                     </button>
                   </>
                 ) : (
@@ -445,8 +793,152 @@ function SellerActivity({ userId }: { userId: string }) {
                   Eliminar
                 </button>
               </div>
+
+              {product.status === "sold" && (
+                <div className="w-full bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-700 dark:text-gray-200">
+                  <p className="font-semibold mb-2 text-gray-900 dark:text-white">
+                    Detalle de la operación
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Tipo</span>
+                      <p className="font-medium">{getSoldLabel(product)}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Usuario</span>
+                      <p className="font-medium">
+                        {product.finalBuyerContact || product.reservedForContact || "No registrado"}
+                      </p>
+                    </div>
+                    {product.finalDealPrice != null && (
+                      <div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Monto</span>
+                        <p className="font-medium">S/. {product.finalDealPrice.toLocaleString()}</p>
+                      </div>
+                    )}
+                    {product.finalDealItems && (
+                      <div className="sm:col-span-2">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Productos o servicios involucrados
+                        </span>
+                        <p className="font-medium break-words">{product.finalDealItems}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {dealModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => (dealModalSaving ? null : setDealModal(null))}
+          />
+          <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm uppercase text-gray-500 dark:text-gray-400 tracking-wide">
+                  Confirmar {dealModal.type === "donation" ? "donación" : dealModal.type === "permuta" ? "permuta" : dealModal.type === "trade" ? "trueque" : "venta"}
+                </p>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Completa los datos finales
+                </h3>
+              </div>
+              <button
+                onClick={() => (dealModalSaving ? null : setDealModal(null))}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                aria-label="Cerrar"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  Correo de la persona
+                </label>
+                <input
+                  type="email"
+                  value={dealModal.email}
+                  onChange={(e) =>
+                    setDealModal((prev) => (prev ? { ...prev, email: e.target.value } : prev))
+                  }
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  placeholder="correo@ejemplo.com"
+                  disabled={dealModalSaving}
+                />
+              </div>
+
+              {(dealModal.type === "trade" || dealModal.type === "permuta") && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Producto o servicio ofrecido al concretar
+                  </label>
+                  <textarea
+                    value={dealModal.items}
+                    onChange={(e) =>
+                      setDealModal((prev) => (prev ? { ...prev, items: e.target.value } : prev))
+                    }
+                    rows={3}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="Ej: bicicleta usada + servicio de mantenimiento"
+                    disabled={dealModalSaving}
+                  />
+                </div>
+              )}
+
+              {dealModal.type === "permuta" && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Monto de diferencia pagado (S/.)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={dealModal.price}
+                    onChange={(e) =>
+                      setDealModal((prev) => (prev ? { ...prev, price: e.target.value } : prev))
+                    }
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="Ej: 150.00"
+                    disabled={dealModalSaving}
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    El monto que pagó el interesado en la permuta (además del producto/servicio ofrecido).
+                  </p>
+                </div>
+              )}
+
+              {dealModalError && (
+                <p className="text-sm text-red-600 dark:text-red-400">{dealModalError}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => (dealModalSaving ? null : setDealModal(null))}
+                className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                disabled={dealModalSaving}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={finalizeWithModal}
+                className="px-4 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 disabled:opacity-60"
+                disabled={dealModalSaving}
+              >
+                {dealModalSaving ? "Guardando..." : "Confirmar operación"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

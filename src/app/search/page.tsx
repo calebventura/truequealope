@@ -9,12 +9,18 @@ import { CATEGORIES } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
 import { ImageCarousel } from "@/components/ui/ImageCarousel";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  COMMUNITIES,
+  getCommunityById,
+} from "@/lib/communities";
 
 type ModeFilter = "all" | "sale" | "trade";
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const initialQuery = searchParams.get("q") || "";
   const initialCategory = searchParams.get("category") || "";
@@ -24,6 +30,7 @@ function SearchContent() {
   const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [communityFilter, setCommunityFilter] = useState<string>("all");
 
   useEffect(() => {
     setSearchTerm(searchParams.get("q") || "");
@@ -103,9 +110,17 @@ function SearchContent() {
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, user, authLoading]);
 
-  const filteredProducts = products.filter((product) => {
+  const filteredByCommunity = products.filter((product) => {
+    if (communityFilter === "all") return true;
+    if (communityFilter === "public") {
+      return (product.visibility ?? "public") !== "community";
+    }
+    return product.communityId === communityFilter;
+  });
+
+  const filteredProducts = filteredByCommunity.filter((product) => {
     const mode = product.mode ?? "sale";
     if (modeFilter === "all") return true;
     if (modeFilter === "sale") return mode === "sale" || mode === "both";
@@ -121,20 +136,56 @@ function SearchContent() {
 
         {/* Filtros */}
         <div className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm mb-8 space-y-4 dark:border dark:border-gray-800 transition-colors">
-          <form
+                    <form
             onSubmit={handleSearch}
-            className="flex flex-col md:flex-row gap-4"
+            className="flex flex-col gap-4"
           >
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                id="search"
-                placeholder="¿Qué estás buscando?"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-4 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
-              />
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  id="search"
+                  placeholder="¿Qué estás buscando?"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-4 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full md:w-auto bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors font-medium"
+              >
+                Buscar
+              </button>
             </div>
+
+            <div className="flex flex-col gap-3">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Comunidad</span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "all", name: "Todas" },
+                  { id: "public", name: "Público" },
+                  ...COMMUNITIES,
+                ].map((community) => {
+                  const active = communityFilter === community.id;
+                  return (
+                    <button
+                      key={community.id}
+                      type="button"
+                      onClick={() => setCommunityFilter(community.id)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        active
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-indigo-400"
+                      }`}
+                    >
+                      {community.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="w-full md:w-48">
               <select
                 id="category"
@@ -150,13 +201,8 @@ function SearchContent() {
                 ))}
               </select>
             </div>
-            <button
-              type="submit"
-              className="w-full md:w-auto bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors font-medium"
-            >
-              Buscar
-            </button>
           </form>
+
 
           {/* Filtro por modo */}
           <div className="inline-flex rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors">
@@ -228,6 +274,7 @@ function SearchContent() {
                   setSearchTerm("");
                   setSelectedCategory("");
                   setModeFilter("all");
+                  setCommunityFilter("all");
                   router.push("/search");
                 }}
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium"
@@ -253,6 +300,10 @@ function SearchContent() {
                 acceptedTypes.includes("product") ||
                 acceptedTypes.includes("service") ||
                 acceptedTypes.includes("exchange_plus_cash");
+              const communityLabel =
+                product.visibility === "community" && product.communityId
+                  ? getCommunityById(product.communityId)?.name ?? "Comunidad privada"
+                  : "Público";
 
               const wantedText =
                 product.wanted && product.wanted.length > 0
@@ -308,7 +359,9 @@ function SearchContent() {
                         </p>
                       ) : acceptsMoney && product.price != null ? (
                         <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                          {isPermuta ? `S/. ${product.price.toLocaleString()} (Dif.)` : `S/. ${product.price.toLocaleString()}`}
+                          {isPermuta
+                            ? `S/. ${product.price.toLocaleString()} (Ref.)`
+                            : `S/. ${product.price.toLocaleString()}`}
                         </p>
                       ) : (
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
@@ -327,7 +380,12 @@ function SearchContent() {
                           {CATEGORIES.find((c) => c.id === product.categoryId)
                             ?.name || "Otro"}
                         </span>
-                        <span>{product.location}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{product.location}</span>
+                          <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-medium">
+                            {communityLabel}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -1,59 +1,71 @@
 # Reglas de Negocio y Lógica del Sistema - Truequealo.pe
 
-Este documento define las reglas de negocio acordadas para el MVP, actualizadas al 23/12/2025.
+Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 
 ## 1. Ciclo de Vida del Producto y Compra
 
 ### Estados del Producto
+- **`active`**: visible y disponible.
+- **`reserved`**: alguien inició intención de compra; bloqueado para otros.
+- **`sold`**: transacción confirmada.
+- **`deleted`**: borrado lógico; no visible en listados públicos.
 
-- **`active` (Activo):** Visible, disponible para compra.
-- **`reserved` (Reservado):** Un comprador ha iniciado la intención de compra. Bloqueado temporalmente para otros.
-- **`sold` (Vendido):** Transacción confirmada por el vendedor.
-- **`deleted` (Eliminado):** Borrado lógico por el vendedor. No visible en listados públicos.
-
-### Flujo de Transacción ("Compra")
-
-1.  **Intención de Compra (Comprador):**
-
-    - El comprador pulsa "Comprar".
-    - **Validación:** El producto debe estar `active` O (`reserved` Y `expirado`).
-    - **Acción:** El producto pasa a estado `reserved`. Se crea una Orden en estado `pending`.
-    - **Bloqueo:** Otros usuarios no pueden iniciar transacción mientras esté vigente la reserva.
-
-2.  **Confirmación (Vendedor):**
-
-    - El vendedor ve la solicitud en "Solicitudes Pendientes".
-    - **Acción:** Vendedor acepta -> Producto pasa a `sold`, Orden pasa a `completed`.
-
-3.  **Rechazo (Vendedor):**
-
-    - **Acción:** Vendedor rechaza -> Producto regresa a `active`, Orden pasa a `cancelled`.
-
-4.  **Expiración de Reserva (Lazy Validation):**
-    - **Configuración:** Tiempo definido por variable de entorno (ej. `NEXT_PUBLIC_RESERVATION_TIME_MINUTES`).
-    - **Lógica:** Si un segundo comprador intenta comprar un producto `reserved` y `fecha_actual > fecha_reserva + tiempo_configurado`, el sistema permite la nueva compra, sobrescribiendo la reserva anterior (la anterior pasa a cancelada implícitamente o se marca explícitamente).
+### Flujo de transacción
+1) **Intención de compra**: valida estado; pasa a `reserved`; crea orden `pending`.
+2) **Confirmación vendedor**: acepta → producto `sold`, orden `completed`. Rechaza → producto `active`, orden `cancelled`.
+3) **Expiración de reserva**: configurable (`NEXT_PUBLIC_RESERVATION_TIME_MINUTES`). Si expiró, otro comprador puede reservar y la reserva previa se invalida.
 
 ## 2. Visibilidad
+- Vendidos se muestran 24h con baja prioridad; siempre visibles para el vendedor.
+- Reservados se muestran con indicador/acción deshabilitada.
 
-- **Productos Vendidos (`sold`):**
-  - Aparecen en el listado público con **baja prioridad**.
-  - **Condición:** Solo visibles si se vendieron hace menos de **24 horas**.
-  - Siempre visibles en el historial del vendedor.
-- **Productos Reservados (`reserved`):**
-  - Aparecen en el listado pero con indicativo de "En trato" o botón deshabilitado.
+## 3. Edición de productos
+- Permitida en `active` y `reserved`.
+- Si está `reserved` y se edita, el comprador debe ver alerta/badge en su detalle de orden (pendiente implementación de aviso).
 
-## 3. Edición de Productos
+## 4. Validaciones de usuario
+- Teléfono: solo formato (regex, 9 dígitos Perú). No hay verificación SMS.
 
-- **Permitido:** En estado `active` y `reserved`.
-- **Alerta:** Si el producto está `reserved` y el vendedor lo edita, el comprador interesado debe ver una **alerta/banner** en su pantalla de detalle de orden indicando que hubo cambios.
+## 5. Gestión del vendedor
+- Dashboard con “Solicitudes Pendientes” para aceptar/rechazar reservas.
 
-## 4. Validaciones de Usuario
+## 6. Tipos de intercambio y publicación
 
-- **Teléfono:**
-  - Validación únicamente por **Formato (Regex)** al registrarse o editar perfil.
-  - No se requiere verificación SMS (Firebase Phone Auth) para el MVP.
-  - Formato esperado: 9 dígitos (Perú).
+| Opción | Definición | Reglas | Datos requeridos |
+| --- | --- | --- | --- |
+| **💰 Dinero** | Venta pura. | Exclusivo. | `price` (valor total). |
+| **🧱 Artículo** | Trueque objeto↔objeto. | Compatible con Servicio; incompatible con Dinero/Permuta/Regalo. | `wantedProducts` (qué busca). |
+| **🛠️ Servicio** | Trueque servicio↔servicio. | Compatible con Artículo; incompatible con Dinero/Permuta/Regalo. | `wantedServices` (qué busca). |
+| **🔄 Permuta** | Objeto/Servicio + dinero ofrecido por el comprador. | Exclusivo. El vendedor fija **precio referencial total**; el comprador debe proponer producto/servicio + monto. | `price` (valor referencial total), al menos uno de `wantedProducts`/`wantedServices`. |
+| **🎁 Regalo** | Donación. | Exclusivo con todas. | Ninguno (precio 0 implícito). |
 
-## 5. Gestión del Vendedor
+**Reglas de interfaz (publicación)**:
+- Elegir "Permuta" limpia Dinero/Regalo.
+- Elegir "Regalo" limpia todo.
+- Artículo y Servicio pueden convivir (trueque mixto).
+- En Permuta, el vendedor solo ingresa **precio referencial total**; se muestra ayuda aclaratoria.
+- Categoría **“Otros”**: obliga a describir la categoría en texto (`otherCategoryLabel`) tanto al crear como al editar.
 
-- **Dashboard:** Debe tener una sección explícita de "Solicitudes Pendientes" para confirmar o rechazar reservas.
+## 7. Contacto y ofertas (detalle de producto)
+- **Venta**: el mensaje de WhatsApp indica que el comprador quiere pagar el precio completo.
+- **Trueque**: el interesado debe escribir qué ofrece antes de abrir WhatsApp; el mensaje se personaliza con su texto.
+- **Permuta**: el interesado debe ingresar producto/servicio ofrecido y monto; ambos van en el mensaje. Antes de abrir WhatsApp se registra la oferta.
+- **Tooltip**: en Permuta se muestra ayuda al lado del precio explicando "Precio referencial total".
+
+## 8. Métricas y ofertas en Firestore
+- **Clicks de contacto**: `products/{productId}/contactLogs` con `{ userId, sellerId, channel, createdAt }` (canal `whatsapp`, `instagram`, `other`). Lectura autenticada; creación por usuarios autenticados para ese producto.
+- **Ofertas de permuta**: `products/{productId}/offers` con `{ userId, sellerId, productId, itemOffer, cashOffer, type: "permuta", createdAt }`. Lectura: vendedor o autor; creación: usuario autenticado y dueño del click.
+
+## 9. Publicación (formulario)
+- Imágenes obligatorias para productos.
+- Condición obligatoria para productos.
+- En Permuta ya no se ingresa "monto diferencial"; solo precio referencial total. Los campos "qué buscas" son requeridos según tipo de intercambio.
+- Categoría “Otros” obliga a capturar `otherCategoryLabel` (texto libre).
+
+## 10. Cierre de operaciones (dashboard vendedor)
+- Asignación de persona por **correo** (no se usa teléfono) antes de cerrar; se verifica contra colección `users`.
+- Al marcar **sold** se abre modal según tipo:
+  - Venta/Donación: pide solo correo.
+  - Trueque: pide correo + producto/servicio entregado.
+  - Permuta: pide correo + producto/servicio entregado + monto de diferencia pagado.
+- Se registran en el producto los campos finales: `finalBuyerUserId`, `finalBuyerContact`, `finalDealPrice`, `finalDealItems`, `finalizedAt`. El estado pasa a `sold` y se muestra el resumen en historial y en el detalle del producto (para el vendedor).
