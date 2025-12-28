@@ -844,7 +844,7 @@ export default function ProductDetailPage() {
 
                       <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900 transition-colors">
                         <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          Clics en “Contactar” (WhatsApp)
+                          Clics en "Contactar" (WhatsApp)
                         </p>
                         <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                           {contactClicks !== null ? contactClicks : "—"}
@@ -854,6 +854,57 @@ export default function ProductDetailPage() {
                           WhatsApp.
                         </p>
                       </div>
+
+                      {product.status === "sold" && (
+                        <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                            Detalle de la operación cerrada
+                          </p>
+                          <div className="space-y-1 text-sm text-gray-700 dark:text-gray-200">
+                            <p>
+                              <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                Tipo:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {acceptedTypes.includes("giveaway")
+                                  ? "DONACIÓN"
+                                  : acceptedTypes.includes("exchange_plus_cash") ||
+                                    acceptedTypes.some((t) => t === "product" || t === "service")
+                                  ? "TRUQUEADO"
+                                  : "VENDIDO"}
+                              </span>
+                            </p>
+                            <p>
+                              <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                Usuario:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {product.finalBuyerContact ||
+                                  product.reservedForContact ||
+                                  "No registrado"}
+                              </span>
+                            </p>
+                            {product.finalDealPrice != null && (
+                              <p>
+                                <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                  Monto:{" "}
+                                </span>
+                                <span className="font-medium">
+                                  S/. {product.finalDealPrice.toLocaleString()}
+                                </span>
+                              </p>
+                            )}
+                            {product.finalDealItems && (
+                              <p className="break-words">
+                                <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                                  Productos/Servicios:{" "}
+                                </span>
+                                <span className="font-medium">{product.finalDealItems}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <Link
                         href="/activity?tab=seller"

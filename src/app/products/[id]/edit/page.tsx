@@ -14,18 +14,32 @@ import { LOCATIONS, Department } from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
 import { COMMUNITIES } from "@/lib/communities";
 
-const productSchema = z.object({
-  title: z.string().min(3, "El título debe tener al menos 3 caracteres"),
-  description: z.string().optional(),
-  price: z.number().positive("El precio debe ser mayor a 0").optional(),
-  wanted: z.string().optional(),
-  categoryId: z.string().min(1, "Selecciona una categoría"),
-  condition: z.enum(["new", "like-new", "used"]).optional(),
-  location: z.string().min(3, "Ingresa una ubicación válida"),
-  communityId: z.string().nullable().optional(),
-});
+const productSchema = z
+  .object({
+    title: z.string().min(3, "El titulo debe tener al menos 3 caracteres"),
+    description: z.string().optional(),
+    price: z.number().positive("El precio debe ser mayor a 0").optional(),
+    wanted: z.string().optional(),
+    categoryId: z.string().min(1, "Selecciona una categoria"),
+    condition: z.enum(["new", "like-new", "used"]).optional(),
+    location: z.string().min(3, "Ingresa una ubicacion valida"),
+    communityId: z.string().nullable().optional(),
+    otherCategoryLabel: z.string().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.categoryId === "other") {
+      const trimmed = (val.otherCategoryLabel ?? "").trim();
+      if (trimmed.length < 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["otherCategoryLabel"],
+          message: "Describe la categoria para 'Otros'.",
+        });
+      }
+    }
+  });
 
-type ProductForm = z.input<typeof productSchema> & { otherCategoryLabel?: string };
+type ProductForm = z.input<typeof productSchema>;
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: productId } = use(params);
@@ -137,11 +151,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
     const selectedCommunity = data.communityId || null;
     const trimmedOther = data.otherCategoryLabel?.trim() || "";
-    if (data.categoryId === "other" && trimmedOther.length < 3) {
-        setError("Describe la categoría para 'Otros'.");
-        setSaving(false);
-        return;
-    }
 
     try {
         const token = await user?.getIdToken();

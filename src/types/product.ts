@@ -50,6 +50,14 @@ export interface Product {
    */
   reservedForUserId?: string | null;
   reservedForContact?: string | null;
+  /**
+   * Datos de la operación final (venta/trueque/permuta/donación).
+   */
+  finalBuyerUserId?: string | null;
+  finalBuyerContact?: string | null;
+  finalDealPrice?: number | null;
+  finalDealItems?: string | null;
+  finalizedAt?: any;
   searchKeywords?: string[];
 
   // Nuevos campos Release 1.0

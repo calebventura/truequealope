@@ -40,16 +40,17 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 | **🎁 Regalo** | Donación. | Exclusivo con todas. | Ninguno (precio 0 implícito). |
 
 **Reglas de interfaz (publicación)**:
-- Elegir “Permuta” limpia Dinero/Regalo.
-- Elegir “Regalo” limpia todo.
+- Elegir "Permuta" limpia Dinero/Regalo.
+- Elegir "Regalo" limpia todo.
 - Artículo y Servicio pueden convivir (trueque mixto).
 - En Permuta, el vendedor solo ingresa **precio referencial total**; se muestra ayuda aclaratoria.
+- Categoría **“Otros”**: obliga a describir la categoría en texto (`otherCategoryLabel`) tanto al crear como al editar.
 
 ## 7. Contacto y ofertas (detalle de producto)
 - **Venta**: el mensaje de WhatsApp indica que el comprador quiere pagar el precio completo.
 - **Trueque**: el interesado debe escribir qué ofrece antes de abrir WhatsApp; el mensaje se personaliza con su texto.
 - **Permuta**: el interesado debe ingresar producto/servicio ofrecido y monto; ambos van en el mensaje. Antes de abrir WhatsApp se registra la oferta.
-- **Tooltip**: en Permuta se muestra ayuda al lado del precio explicando “Precio referencial total”.
+- **Tooltip**: en Permuta se muestra ayuda al lado del precio explicando "Precio referencial total".
 
 ## 8. Métricas y ofertas en Firestore
 - **Clicks de contacto**: `products/{productId}/contactLogs` con `{ userId, sellerId, channel, createdAt }` (canal `whatsapp`, `instagram`, `other`). Lectura autenticada; creación por usuarios autenticados para ese producto.
@@ -58,4 +59,13 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 ## 9. Publicación (formulario)
 - Imágenes obligatorias para productos.
 - Condición obligatoria para productos.
-- En Permuta ya no se ingresa “monto diferencial”; solo precio referencial total. Los campos “qué buscas” son requeridos según tipo de intercambio.
+- En Permuta ya no se ingresa "monto diferencial"; solo precio referencial total. Los campos "qué buscas" son requeridos según tipo de intercambio.
+- Categoría “Otros” obliga a capturar `otherCategoryLabel` (texto libre).
+
+## 10. Cierre de operaciones (dashboard vendedor)
+- Asignación de persona por **correo** (no se usa teléfono) antes de cerrar; se verifica contra colección `users`.
+- Al marcar **sold** se abre modal según tipo:
+  - Venta/Donación: pide solo correo.
+  - Trueque: pide correo + producto/servicio entregado.
+  - Permuta: pide correo + producto/servicio entregado + monto de diferencia pagado.
+- Se registran en el producto los campos finales: `finalBuyerUserId`, `finalBuyerContact`, `finalDealPrice`, `finalDealItems`, `finalizedAt`. El estado pasa a `sold` y se muestra el resumen en historial y en el detalle del producto (para el vendedor).
