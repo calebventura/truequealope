@@ -159,3 +159,14 @@ La aplicación estará disponible en `http://localhost:3000`.
 - Formulario de publicación: en Permuta el vendedor solo define el precio referencial total (sin monto diferencial) y los campos "qué buscas" son requeridos según el tipo de intercambio.
 - Cierre de operaciones en dashboard vendedor: se exige asignar usuario por correo; al marcar vendido se capturan y guardan en el producto los datos finales (`finalBuyerContact`, `finalBuyerUserId`, `finalDealPrice`, `finalDealItems`, `finalizedAt`) y se muestran en historial y detalle.
 
+
+## 11. Tendencias (MVP)
+- Configuracion en `src/lib/trends.ts`.
+- Cada tendencia soporta `startAt`/`endAt` (desactivacion programada) y `active` manual.
+- Se puede filtrar por `categoryId`/`categoryIds`, `condition`, `listingType`, `exchangeTypesAny` y `searchQuery`.
+- Listas curadas: `productIds` limita a productos concretos (recomendado <= 10 ids).
+- La home muestra solo tendencias activas y el buscador acepta `?trend=<id>` para aplicar los filtros.
+- Curacion manual: agrega `trendTags` (array) al producto; coincide con `filters.trendTagsAny`.
+- Fechas: usar formato `YYYY-MM-DD` en `startAt` y `endAt` (inclusive, zona local).
+- Script admin: `node scripts/tag-products.js --productIds id1,id2 --addTags moving-urgent --yes` (soporta `--removeTags` y `--dry-run`).
+- Script admin: `node scripts/list-products.js --categoryIds home,other --status active,reserved --limit 20` (imprime ids para tagging).

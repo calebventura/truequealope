@@ -14,6 +14,7 @@ import { logContactClick, getContactClicksCount } from "@/lib/contact";
 import { UserProfile } from "@/types/user";
 import { COMMUNITIES, getCommunityById } from "@/lib/communities";
 import { createPermutaOffer } from "@/lib/offers";
+import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 
 const resolveProfileDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -53,24 +54,21 @@ export default function ProductDetailPage() {
   // Initialize intent based on product type
   useEffect(() => {
     if (product) {
-      const acceptedTypes = product.acceptedExchangeTypes || [];
-      // Fallback legacy logic
-      if (acceptedTypes.length === 0) {
-         if (product.mode === 'trade') setContactIntent('trade');
-         else setContactIntent('buy');
+      const acceptedTypes = getAcceptedExchangeTypes(product);
+      const hasMoney =
+        acceptedTypes.includes("money") ||
+        acceptedTypes.includes("exchange_plus_cash");
+      const hasTrade = acceptedTypes.some((t) =>
+        ["product", "service"].includes(t)
+      );
+      const isPermutaType = acceptedTypes.includes("exchange_plus_cash");
+
+      if (isPermutaType) {
+        setContactIntent("trade");
+      } else if (!hasMoney && hasTrade) {
+        setContactIntent("trade");
       } else {
-         // Priority: if trade only, set trade. Else default buy.
-         const hasMoney = acceptedTypes.includes('money') || acceptedTypes.includes('exchange_plus_cash');
-         const hasTrade = acceptedTypes.some(t => ['product', 'service'].includes(t));
-         const isPermutaType = acceptedTypes.includes('exchange_plus_cash');
-         
-         if (isPermutaType) {
-             setContactIntent('trade');
-         } else if (!hasMoney && hasTrade) {
-             setContactIntent('trade');
-         } else {
-        setContactIntent('buy');
-       }
+        setContactIntent("buy");
       }
     }
   }, [product]);
@@ -370,18 +368,7 @@ export default function ProductDetailPage() {
 
   // Derivados principales (se calculan siempre para no romper el orden de hooks)
   const listingType = product?.listingType || "product";
-  const acceptedTypes = product?.acceptedExchangeTypes
-    ? [...product.acceptedExchangeTypes]
-    : [];
-
-  if (product && acceptedTypes.length === 0) {
-    if (product.mode === "sale") acceptedTypes.push("money");
-    else if (product.mode === "trade") acceptedTypes.push("product");
-    else if (product.mode === "both") {
-      acceptedTypes.push("money");
-      acceptedTypes.push("product");
-    }
-  }
+  const acceptedTypes = product ? getAcceptedExchangeTypes(product) : [];
 
   const isGiveaway = acceptedTypes.includes("giveaway");
   const isPermuta = acceptedTypes.includes("exchange_plus_cash");

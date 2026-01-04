@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { collection, query, where, getDocs, QueryConstraint } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
+import { getTrendById, isTrendActive } from "@/lib/trends";
+import {
+  ExchangeFilter,
+  ListingFilter,
+  getAcceptedExchangeTypes,
+  matchesExchangeFilter,
+  matchesListingFilter,
+} from "@/lib/productFilters";
 import Link from "next/link";
 import Image from "next/image";
 import { ImageCarousel } from "@/components/ui/ImageCarousel";
@@ -15,8 +23,6 @@ import {
   getCommunityById,
 } from "@/lib/communities";
 
-type ModeFilter = "all" | "sale" | "trade";
-
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -24,13 +30,22 @@ function SearchContent() {
 
   const initialQuery = searchParams.get("q") || "";
   const initialCategory = searchParams.get("category") || "";
+  const trendId = searchParams.get("trend") || "";
 
   const [searchTerm, setSearchTerm] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
+  const [exchangeFilter, setExchangeFilter] = useState<ExchangeFilter>("all");
+  const [listingFilter, setListingFilter] = useState<ListingFilter>("all");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [communityFilter, setCommunityFilter] = useState<string>("all");
+
+  const activeTrend = useMemo(() => {
+    if (!trendId) return null;
+    const trend = getTrendById(trendId);
+    if (!trend || !isTrendActive(trend)) return null;
+    return trend;
+  }, [trendId]);
 
   useEffect(() => {
     setSearchTerm(searchParams.get("q") || "");
@@ -40,9 +55,67 @@ function SearchContent() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
+    if (activeTrend) params.set("trend", activeTrend.id);
     if (searchTerm) params.set("q", searchTerm);
     if (selectedCategory) params.set("category", selectedCategory);
     router.push(`/search?${params.toString()}`);
+  };
+
+  const applyTrendFilters = (items: Product[]) => {
+    if (!activeTrend) return items;
+
+    const { filters, productIds } = activeTrend;
+    let filtered = items;
+
+    if (productIds && productIds.length > 0) {
+      const idSet = new Set(productIds);
+      filtered = filtered.filter((product) => product.id && idSet.has(product.id));
+    }
+
+    if (filters?.categoryId) {
+      filtered = filtered.filter((product) => product.categoryId === filters.categoryId);
+    }
+
+    if (filters?.categoryIds && filters.categoryIds.length > 0) {
+      const categorySet = new Set(filters.categoryIds);
+      filtered = filtered.filter((product) => categorySet.has(product.categoryId));
+    }
+
+    if (filters?.condition) {
+      filtered = filtered.filter((product) => product.condition === filters.condition);
+    }
+
+    if (filters?.listingType) {
+      filtered = filtered.filter(
+        (product) => (product.listingType ?? "product") === filters.listingType
+      );
+    }
+
+    if (filters?.trendTagsAny && filters.trendTagsAny.length > 0) {
+      const tagSet = new Set(filters.trendTagsAny);
+      filtered = filtered.filter((product) => {
+        const tags = product.trendTags ?? [];
+        return tags.some((tag) => tagSet.has(tag));
+      });
+    }
+
+    if (filters?.exchangeTypesAny && filters.exchangeTypesAny.length > 0) {
+      filtered = filtered.filter((product) => {
+        const accepted = getAcceptedExchangeTypes(product);
+        return filters.exchangeTypesAny?.some((type) => accepted.includes(type));
+      });
+    }
+
+    if (filters?.searchQuery) {
+      const lowerQuery = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (product) =>
+          product.title.toLowerCase().includes(lowerQuery) ||
+          product.description.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    return filtered;
   };
 
   useEffect(() => {
@@ -82,6 +155,8 @@ function SearchContent() {
              return true;
         });
 
+        results = applyTrendFilters(results);
+
         if (searchTerm) {
           const lowerTerm = searchTerm.toLowerCase();
           results = results.filter(
@@ -110,7 +185,7 @@ function SearchContent() {
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory, user, authLoading]);
+  }, [searchTerm, selectedCategory, user, authLoading, activeTrend]);
 
   const filteredByCommunity = products.filter((product) => {
     if (communityFilter === "all") return true;
@@ -120,12 +195,12 @@ function SearchContent() {
     return product.communityId === communityFilter;
   });
 
-  const filteredProducts = filteredByCommunity.filter((product) => {
-    const mode = product.mode ?? "sale";
-    if (modeFilter === "all") return true;
-    if (modeFilter === "sale") return mode === "sale" || mode === "both";
-    return mode === "trade" || mode === "both";
-  });
+  const exchangeFiltered = filteredByCommunity.filter((product) =>
+    matchesExchangeFilter(product, exchangeFilter)
+  );
+  const filteredProducts = exchangeFiltered.filter((product) =>
+    matchesListingFilter(product, listingFilter)
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 transition-colors duration-300">
@@ -136,6 +211,20 @@ function SearchContent() {
 
         {/* Filtros */}
         <div className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm mb-8 space-y-4 dark:border dark:border-gray-800 transition-colors">
+          {activeTrend && (
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 px-3 py-1 font-medium text-indigo-800 dark:text-indigo-200">
+                Tendencia: {activeTrend.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => router.push("/search")}
+                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium"
+              >
+                Quitar
+              </button>
+            </div>
+          )}
                     <form
             onSubmit={handleSearch}
             className="flex flex-col gap-4"
@@ -204,41 +293,105 @@ function SearchContent() {
           </form>
 
 
-          {/* Filtro por modo */}
-          <div className="inline-flex rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors">
-            <button
-              type="button"
-              onClick={() => setModeFilter("all")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modeFilter === "all"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-              }`}
-            >
-              Ambos
-            </button>
-            <button
-              type="button"
-              onClick={() => setModeFilter("sale")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modeFilter === "sale"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-              }`}
-            >
-              Venta
-            </button>
-            <button
-              type="button"
-              onClick={() => setModeFilter("trade")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modeFilter === "trade"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-              }`}
-            >
-              Trueque
-            </button>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Tipo de intercambio
+            </span>
+            <div className="flex flex-wrap rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors gap-1">
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("all")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "all"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("sale")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "sale"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Venta
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("trade")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "trade"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Trueque
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("permuta")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "permuta"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Permuta
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("giveaway")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "giveaway"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Regalo
+              </button>
+            </div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Tipo de publicacion
+            </span>
+            <div className="flex flex-wrap rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors gap-1">
+              <button
+                type="button"
+                onClick={() => setListingFilter("all")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  listingFilter === "all"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setListingFilter("product")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  listingFilter === "product"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Producto
+              </button>
+              <button
+                type="button"
+                onClick={() => setListingFilter("service")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  listingFilter === "service"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                }`}
+              >
+                Servicio
+              </button>
+            </div>
           </div>
         </div>
 
@@ -273,7 +426,8 @@ function SearchContent() {
                 onClick={() => {
                   setSearchTerm("");
                   setSelectedCategory("");
-                  setModeFilter("all");
+                  setExchangeFilter("all");
+                  setListingFilter("all");
                   setCommunityFilter("all");
                   router.push("/search");
                 }}
@@ -286,13 +440,7 @@ function SearchContent() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => {
-              const acceptedTypes =
-                product.acceptedExchangeTypes ||
-                (product.mode === "trade"
-                  ? ["product"]
-                  : product.mode === "both"
-                  ? ["money", "product"]
-                  : ["money"]);
+              const acceptedTypes = getAcceptedExchangeTypes(product);
               const isGiveaway = acceptedTypes.includes("giveaway");
               const isPermuta = acceptedTypes.includes("exchange_plus_cash");
               const acceptsMoney = acceptedTypes.includes("money");

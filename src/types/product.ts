@@ -68,5 +68,10 @@ export interface Product {
   // Comunidad / visibilidad
   visibility?: ProductVisibility;
   communityId?: string | null;
+
+  /**
+   * Etiquetas de tendencia para curacion manual.
+   */
+  trendTags?: string[];
 }
 

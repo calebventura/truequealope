@@ -5,6 +5,14 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
+import { buildTrendHref, getActiveTrends } from "@/lib/trends";
+import {
+  ExchangeFilter,
+  ListingFilter,
+  getAcceptedExchangeTypes,
+  matchesExchangeFilter,
+  matchesListingFilter,
+} from "@/lib/productFilters";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,14 +22,14 @@ import {
   getCommunityById,
 } from "@/lib/communities";
 
-type ModeFilter = "all" | "sale" | "trade";
-
 export default function HomePage() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
+  const [exchangeFilter, setExchangeFilter] = useState<ExchangeFilter>("all");
+  const [listingFilter, setListingFilter] = useState<ListingFilter>("all");
   const [communityFilter, setCommunityFilter] = useState<string>("all");
+  const trends = getActiveTrends();
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -89,12 +97,12 @@ export default function HomePage() {
     return product.communityId === communityFilter;
   });
 
-  const filteredProducts = communityFiltered.filter((product) => {
-    const mode = product.mode ?? "sale";
-    if (modeFilter === "all") return true;
-    if (modeFilter === "sale") return mode === "sale" || mode === "both";
-    return mode === "trade" || mode === "both";
-  });
+  const exchangeFiltered = communityFiltered.filter((product) =>
+    matchesExchangeFilter(product, exchangeFilter)
+  );
+  const filteredProducts = exchangeFiltered.filter((product) =>
+    matchesListingFilter(product, listingFilter)
+  );
 
   if (loading) {
     return (
@@ -131,6 +139,47 @@ export default function HomePage() {
             </Link>
           </div>
         </section>
+
+        {trends.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Tendencias
+              </h2>
+              <Link
+                href="/search"
+                className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500"
+              >
+                Ver todas
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {trends.map((trend) => (
+                <Link
+                  key={trend.id}
+                  href={buildTrendHref(trend)}
+                  className="group rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white to-indigo-50 dark:from-gray-900 dark:to-indigo-950/40 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {trend.title}
+                      </p>
+                      {trend.subtitle && (
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                          {trend.subtitle}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-2xl text-indigo-600 dark:text-indigo-300">
+                      {trend.icon ?? "#"}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Categorías */}
         <div className="mb-12">
@@ -189,40 +238,105 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="inline-flex rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors">
-            <button
-              type="button"
-              onClick={() => setModeFilter("all")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modeFilter === "all"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              Ambos
-            </button>
-            <button
-              type="button"
-              onClick={() => setModeFilter("sale")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modeFilter === "sale"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              Venta
-            </button>
-            <button
-              type="button"
-              onClick={() => setModeFilter("trade")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modeFilter === "trade"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              Trueque
-            </button>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Tipo de intercambio
+            </span>
+            <div className="flex flex-wrap rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors gap-1">
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("all")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "all"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("sale")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "sale"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Venta
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("trade")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "trade"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Trueque
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("permuta")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "permuta"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Permuta
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeFilter("giveaway")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  exchangeFilter === "giveaway"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Regalo
+              </button>
+            </div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Tipo de publicacion
+            </span>
+            <div className="flex flex-wrap rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors gap-1">
+              <button
+                type="button"
+                onClick={() => setListingFilter("all")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  listingFilter === "all"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setListingFilter("product")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  listingFilter === "product"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Producto
+              </button>
+              <button
+                type="button"
+                onClick={() => setListingFilter("service")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  listingFilter === "service"
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Servicio
+              </button>
+            </div>
           </div>
         </div>
 
@@ -231,10 +345,13 @@ export default function HomePage() {
             <p className="text-gray-500 dark:text-gray-400 text-lg">
               No hay productos para este filtro.
             </p>
-            {modeFilter !== "all" && (
+            {(exchangeFilter !== "all" || listingFilter !== "all") && (
               <button
                 type="button"
-                onClick={() => setModeFilter("all")}
+                onClick={() => {
+                  setExchangeFilter("all");
+                  setListingFilter("all");
+                }}
                 className="mt-3 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium"
               >
                 Ver todos
@@ -244,13 +361,7 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {filteredProducts.map((product) => {
-              const acceptedTypes =
-                product.acceptedExchangeTypes ||
-                (product.mode === "trade"
-                  ? ["product"]
-                  : product.mode === "both"
-                  ? ["money", "product"]
-                  : ["money"]);
+              const acceptedTypes = getAcceptedExchangeTypes(product);
               const isGiveaway = acceptedTypes.includes("giveaway");
               const isPermuta = acceptedTypes.includes("exchange_plus_cash");
               const acceptsMoney = acceptedTypes.includes("money");

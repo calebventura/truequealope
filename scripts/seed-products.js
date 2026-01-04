@@ -255,6 +255,11 @@ function buildSeedProducts({ sellerId, count }) {
         : "Venta directa por WhatsApp.",
     ].join(" ");
 
+    const trendTags = [];
+    if ((base.categoryId === "home" || base.categoryId === "other") && index % 4 === 0) {
+      trendTags.push("moving-urgent");
+    }
+
     return {
       id: `seed_${pad4(index + 1)}`,
       data: {
@@ -271,6 +276,7 @@ function buildSeedProducts({ sellerId, count }) {
         mode,
         wanted,
         searchKeywords: normalizeKeywords(title),
+        trendTags: trendTags.length > 0 ? trendTags : undefined,
         seed: true,
       },
     };
