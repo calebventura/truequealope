@@ -22,6 +22,8 @@ import {
   getCommunityById,
 } from "@/lib/communities";
 
+const NEW_BADGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export default function HomePage() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +32,7 @@ export default function HomePage() {
   const [listingFilter, setListingFilter] = useState<ListingFilter>("all");
   const [communityFilter, setCommunityFilter] = useState<string>("all");
   const trends = getActiveTrends();
+  const nowTimestamp = Date.now();
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -74,11 +77,7 @@ export default function HomePage() {
             return b.createdAt.getTime() - a.createdAt.getTime();
         });
 
-        const visibleProducts = user
-          ? validProducts.filter((p) => p.sellerId !== user.uid)
-          : validProducts;
-
-        setProducts(visibleProducts);
+        setProducts(validProducts);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {
@@ -118,11 +117,10 @@ export default function HomePage() {
         {/* Hero */}
         <section className="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 shadow-sm mb-10 transition-colors border border-transparent dark:border-gray-800">
           <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white">
-            Cambia o vende lo que no usas
+            Intercambia lo que ya no usas
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Publica en minutos, coordina por WhatsApp y encuentra oportunidades
-            cerca de ti.
+            Si no encuentras el trueque ideal, también puedes venderlo.
           </p>
           <div className="mt-4 flex flex-col sm:flex-row gap-3">
             <Link
@@ -365,6 +363,10 @@ export default function HomePage() {
               const isGiveaway = acceptedTypes.includes("giveaway");
               const isPermuta = acceptedTypes.includes("exchange_plus_cash");
               const acceptsMoney = acceptedTypes.includes("money");
+              const isOwn = Boolean(user && product.sellerId === user.uid);
+              const isNew =
+                product.status !== "sold" &&
+                nowTimestamp - product.createdAt.getTime() < NEW_BADGE_WINDOW_MS;
               const acceptsTrade =
                 acceptedTypes.includes("product") ||
                 acceptedTypes.includes("service") ||
@@ -391,13 +393,31 @@ export default function HomePage() {
                   href={`/products/${product.id}`}
                   className="group"
                 >
-                  <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border border-transparent dark:border-gray-800">
+                  <div
+                    className={`bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border ${
+                      isOwn
+                        ? "border-indigo-200 dark:border-indigo-900 ring-1 ring-indigo-200/60 dark:ring-indigo-900/60"
+                        : "border-transparent dark:border-gray-800"
+                    }`}
+                  >
                     <div className="relative aspect-square w-full bg-gray-200 dark:bg-gray-800">
-                      {modeBadge && (
-                        <div className="absolute top-2 left-2 z-10 bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
-                          {modeBadge}
-                        </div>
-                      )}
+                      <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+                        {isOwn && (
+                          <span className="bg-emerald-100 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                            Tu publicacion
+                          </span>
+                        )}
+                        {isNew && (
+                          <span className="bg-yellow-100 dark:bg-yellow-900/80 text-yellow-800 dark:text-yellow-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                            Nuevo
+                          </span>
+                        )}
+                        {modeBadge && (
+                          <span className="bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                            {modeBadge}
+                          </span>
+                        )}
+                      </div>
                       {product.status === "reserved" && (
                         <div className="absolute top-2 right-2 z-10 bg-yellow-100 dark:bg-yellow-900/80 text-yellow-800 dark:text-yellow-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
                           Reservado

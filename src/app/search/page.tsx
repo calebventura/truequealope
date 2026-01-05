@@ -23,6 +23,8 @@ import {
   getCommunityById,
 } from "@/lib/communities";
 
+const NEW_BADGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -39,6 +41,7 @@ function SearchContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [communityFilter, setCommunityFilter] = useState<string>("all");
+  const nowTimestamp = Date.now();
 
   const activeTrend = useMemo(() => {
     if (!trendId) return null;
@@ -444,6 +447,10 @@ function SearchContent() {
               const isGiveaway = acceptedTypes.includes("giveaway");
               const isPermuta = acceptedTypes.includes("exchange_plus_cash");
               const acceptsMoney = acceptedTypes.includes("money");
+              const isOwn = Boolean(user && product.sellerId === user.uid);
+              const isNew =
+                product.status !== "sold" &&
+                nowTimestamp - product.createdAt.getTime() < NEW_BADGE_WINDOW_MS;
               const acceptsTrade =
                 acceptedTypes.includes("product") ||
                 acceptedTypes.includes("service") ||
@@ -470,13 +477,31 @@ function SearchContent() {
                   href={`/products/${product.id}`}
                   className="group"
                 >
-                  <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border border-transparent dark:border-gray-800">
+                  <div
+                    className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border ${
+                      isOwn
+                        ? "border-indigo-200 dark:border-indigo-900 ring-1 ring-indigo-200/60 dark:ring-indigo-900/60"
+                        : "border-transparent dark:border-gray-800"
+                    }`}
+                  >
                     <div className="relative h-48 w-full bg-gray-200 dark:bg-gray-800">
-                      {modeBadge && (
-                        <div className="absolute top-2 left-2 z-10 bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
-                          {modeBadge}
-                        </div>
-                      )}
+                      <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+                        {isOwn && (
+                          <span className="bg-emerald-100 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                            Tu publicacion
+                          </span>
+                        )}
+                        {isNew && (
+                          <span className="bg-yellow-100 dark:bg-yellow-900/80 text-yellow-800 dark:text-yellow-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                            Nuevo
+                          </span>
+                        )}
+                        {modeBadge && (
+                          <span className="bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
+                            {modeBadge}
+                          </span>
+                        )}
+                      </div>
                       {product.images && product.images.length > 0 ? (
                         product.images.length > 1 ? (
                           <ImageCarousel images={product.images} alt={product.title} />
