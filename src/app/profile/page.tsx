@@ -10,6 +10,131 @@ import { uploadImage } from "@/lib/storage";
 import { UserProfile } from "@/types/user";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
+import { LOCATIONS, Department } from "@/lib/locations";
+
+const PROVINCES_BY_DEPARTMENT: Record<Department, string[]> = {
+  LIMA: ["Lima"],
+  AREQUIPA: ["Arequipa"],
+};
+
+const getDepartmentFromLabel = (value?: string | null): Department | "" => {
+  if (!value) return "";
+  const normalized = value.trim().toLowerCase();
+  const match = (Object.keys(LOCATIONS) as Department[]).find(
+    (dept) => dept.toLowerCase() === normalized
+  );
+  return match ?? "";
+};
+
+const getProvinceFromLabel = (
+  department: Department,
+  value?: string | null
+) => {
+  const options = PROVINCES_BY_DEPARTMENT[department] ?? [];
+  if (!value) return options[0] ?? "";
+  const normalized = value.trim().toLowerCase();
+  return options.find((opt) => opt.toLowerCase() === normalized) ?? options[0] ?? "";
+};
+
+const getDistrictFromLabel = (
+  department: Department,
+  value?: string | null
+) => {
+  if (!value) return "";
+  const normalized = value.trim().toLowerCase();
+  return (
+    LOCATIONS[department].find(
+      (district) => district.toLowerCase() === normalized
+    ) ?? ""
+  );
+};
+
+const parseAddressFields = (address?: string | null) => {
+  if (!address) return { addressLine: "" };
+  const trimmed = address.trim();
+  if (!trimmed) return { addressLine: "" };
+
+  let addressLine = "";
+  let locationPart = trimmed;
+
+  if (trimmed.includes(" - ")) {
+    const parts = trimmed.split(" - ");
+    addressLine = parts.slice(0, -1).join(" - ").trim();
+    locationPart = parts[parts.length - 1].trim();
+  }
+
+  const tokens = locationPart
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    return { addressLine: addressLine || trimmed };
+  }
+
+  const department = getDepartmentFromLabel(tokens[tokens.length - 1]);
+  if (!department) {
+    return { addressLine: addressLine || trimmed };
+  }
+
+  let province = "";
+  let district = "";
+  if (tokens.length >= 3) {
+    province = getProvinceFromLabel(department, tokens[tokens.length - 2]);
+    district = getDistrictFromLabel(department, tokens[tokens.length - 3]);
+    const leftover = tokens.slice(0, -3).join(", ").trim();
+    if (!addressLine) addressLine = leftover;
+  } else if (tokens.length >= 2) {
+    province = getProvinceFromLabel(department, "");
+    district = getDistrictFromLabel(department, tokens[tokens.length - 2]);
+    const leftover = tokens.slice(0, -2).join(", ").trim();
+    if (!addressLine) addressLine = leftover;
+  } else {
+    province = getProvinceFromLabel(department, "");
+  }
+
+  return { addressLine, department, province, district };
+};
+
+const resolveProfileLocation = (profile: Partial<UserProfile>) => {
+  const fallback = parseAddressFields(profile.address ?? null);
+  const explicitDepartment = getDepartmentFromLabel(profile.department ?? null);
+  if (!explicitDepartment) {
+    return fallback;
+  }
+
+  const province = getProvinceFromLabel(
+    explicitDepartment,
+    profile.province ?? fallback.province ?? null
+  );
+  const district = getDistrictFromLabel(
+    explicitDepartment,
+    profile.district ?? fallback.district ?? null
+  );
+  const addressLine = (profile.addressLine ?? fallback.addressLine ?? "").trim();
+
+  return {
+    department: explicitDepartment,
+    province,
+    district,
+    addressLine,
+  };
+};
+
+const buildProfileAddress = (
+  addressLine: string,
+  district: string,
+  province: string,
+  department: string
+) => {
+  const line = addressLine.trim();
+  const locationParts = [district, province, department].filter((part) => part && part.trim());
+  if (line && locationParts.length > 0) {
+    return `${line} - ${locationParts.join(", ")}`;
+  }
+  if (line) return line;
+  return locationParts.join(", ");
+};
 
 function ProfileContent() {
   const { user, loading: authLoading } = useAuth();
@@ -27,6 +152,14 @@ function ProfileContent() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const provinceOptions = selectedDepartment
+    ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
+    : [];
+  const districtOptions = selectedDepartment ? LOCATIONS[selectedDepartment] : [];
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,7 +175,13 @@ function ProfileContent() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setFormData(docSnap.data() as UserProfile);
+          const data = docSnap.data() as UserProfile;
+          setFormData(data);
+          const location = resolveProfileLocation(data);
+          setSelectedDepartment(location.department ?? "");
+          setSelectedProvince(location.province ?? "");
+          setSelectedDistrict(location.district ?? "");
+          setAddressLine(location.addressLine ?? "");
         } else {
           setFormData({
             uid: user.uid,
@@ -50,6 +189,10 @@ function ProfileContent() {
             displayName: user.displayName,
             photoURL: user.photoURL,
           });
+          setSelectedDepartment("");
+          setSelectedProvince("");
+          setSelectedDistrict("");
+          setAddressLine("");
         }
 
         if (user.photoURL) {
@@ -77,6 +220,28 @@ function ProfileContent() {
     }
   };
 
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const department = e.target.value as Department | "";
+    setSelectedDepartment(department);
+    if (department) {
+      const defaultProvince = PROVINCES_BY_DEPARTMENT[department]?.[0] ?? "";
+      setSelectedProvince(defaultProvince);
+    } else {
+      setSelectedProvince("");
+    }
+    setSelectedDistrict("");
+  };
+
+  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const province = e.target.value;
+    setSelectedProvince(province);
+    setSelectedDistrict("");
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDistrict(e.target.value);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -100,12 +265,28 @@ function ProfileContent() {
       }
 
       const userRef = doc(db, "users", user.uid);
+      const departmentValue = selectedDepartment || null;
+      const provinceValue = selectedDepartment ? selectedProvince || null : null;
+      const districtValue = selectedDepartment ? selectedDistrict || null : null;
+      const trimmedAddressLine = addressLine.trim();
+      const combinedAddress = buildProfileAddress(
+        trimmedAddressLine,
+        districtValue ?? "",
+        provinceValue ?? "",
+        departmentValue ?? ""
+      );
+
       const updatedData: Partial<UserProfile> = {
         ...formData,
         photoURL,
         updatedAt: new Date(),
         email: user.email,
         uid: user.uid,
+        address: combinedAddress || null,
+        addressLine: trimmedAddressLine || null,
+        department: departmentValue,
+        province: provinceValue,
+        district: districtValue,
       };
 
       await setDoc(userRef, updatedData, { merge: true });
@@ -501,54 +682,80 @@ function ProfileContent() {
 
   
 
-                {/* Dirección */}
+                {/* Direccion */}
+
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Departamento
+                  </label>
+                  <select
+                    value={selectedDepartment}
+                    onChange={handleDepartmentChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
+                  >
+                    <option value="">Selecciona un departamento</option>
+                    {Object.keys(LOCATIONS).map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Provincia
+                  </label>
+                  <select
+                    value={selectedProvince}
+                    onChange={handleProvinceChange}
+                    disabled={!selectedDepartment}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors disabled:opacity-50"
+                  >
+                    <option value="">Selecciona una provincia</option>
+                    {provinceOptions.map((province) => (
+                        <option key={province} value={province}>
+                          {province}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Distrito
+                  </label>
+                  <select
+                    value={selectedDistrict}
+                    onChange={handleDistrictChange}
+                    disabled={!selectedDepartment || !selectedProvince}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors disabled:opacity-50"
+                  >
+                    <option value="">Selecciona un distrito</option>
+                    {districtOptions.map((district) => (
+                        <option key={district} value={district}>
+                          {district}
+                        </option>
+                      ))}
+                  </select>
+                </div>
 
                 <div className="sm:col-span-6">
-
-                  <label
-
-                    htmlFor="address"
-
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-
-                  >
-
-                    Dirección / ubicación
-
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Direccion
                   </label>
-
                   <div className="mt-1">
-
-                    <textarea
-
-                      id="address"
-
-                      name="address"
-
-                      rows={3}
-
-                      value={formData.address || ""}
-
-                      onChange={(e) =>
-
-                        setFormData({ ...formData, address: e.target.value })
-
-                      }
-
+                    <input
+                      type="text"
+                      value={addressLine}
+                      onChange={(e) => setAddressLine(e.target.value)}
                       className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
-
-                      placeholder="Ciudad, comuna, región..."
-
+                      placeholder="Calle, numero, referencia"
                     />
-
                   </div>
-
                   <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-
-                    Esta información ayuda a coordinar las entregas.
-
+                    Esta informacion ayuda a coordinar las entregas.
                   </p>
-
                 </div>
 
               </div>
