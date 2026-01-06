@@ -70,6 +70,7 @@ Ubicados en `src/components`, estos son algunos de los componentes más importan
 - **`AppShell.tsx`:** Componente principal que envuelve el contenido de la aplicación, probablemente incluyendo la `Navbar` y `BottomNav`.
 - **`Navbar.tsx`:** Barra de navegación superior.
 - **`BottomNav.tsx`:** Barra de navegación inferior, común en interfaces móviles.
+- **`FiltersPanel.tsx`:** Panel de filtros reutilizable para Home y Search; en mobile es bottom sheet y en desktop un drawer lateral. Soporta multiselección, "Aplicar filtros" y limpiar por criterio.
 - **`TestFirestoreClient.tsx`:** Un componente de prueba para verificar la conexión con Firestore.
 - **`ui/Button.tsx`:** Componente de botón reutilizable y estilizado.
 
@@ -149,7 +150,8 @@ La aplicación estará disponible en `http://localhost:3000`.
 - Campos de producto: `communityId` opcional (categoría principal). Todas las publicaciones son públicas; `visibility` se fija en `"public"` para compatibilidad.
 - No hay membresías: cualquier usuario puede ver/filtrar cualquier comunidad. La colección `userCommunities` ya no es necesaria para el acceso.
 - Publicación/edición: se puede elegir comunidad (opcional) y categoría secundaria; por defecto queda "público".
-- Listados (inicio y buscador): primer filtro por comunidad, luego categoría; las cards muestran un badge con la comunidad o "Público".
+- Listados (inicio y buscador): filtros en panel lateral/bottom sheet con multiselección por criterio (categoría, tendencia, comunidad, tipo de intercambio, tipo de publicación). Se aplican con "Aplicar filtros" y hay limpiar global y por criterio. Las cards muestran un badge con la comunidad o "Público".
+- Home: las secciones de tendencias y categorías se integraron al panel de filtros.
 - Categoría “Otros”: el formulario de alta y edición obliga a ingresar `otherCategoryLabel` (texto libre). En los listados se etiqueta como “Otros” y en detalle muestra el label personalizado.
 
 ## 10. UX de contacto y permuta (resumen)
@@ -165,7 +167,8 @@ La aplicación estará disponible en `http://localhost:3000`.
 - Cada tendencia soporta `startAt`/`endAt` (desactivacion programada) y `active` manual.
 - Se puede filtrar por `categoryId`/`categoryIds`, `condition`, `listingType`, `exchangeTypesAny` y `searchQuery`.
 - Listas curadas: `productIds` limita a productos concretos (recomendado <= 10 ids).
-- La home muestra solo tendencias activas y el buscador acepta `?trend=<id>` para aplicar los filtros.
+- Las tendencias se muestran como filtros (home y search), con multiselección y unión de resultados.
+- El buscador ya no usa `?trend=<id>`; los filtros de tendencia son estado local.
 - Curacion manual: agrega `trendTags` (array) al producto; coincide con `filters.trendTagsAny`.
 - Fechas: usar formato `YYYY-MM-DD` en `startAt` y `endAt` (inclusive, zona local).
 - Script admin: `node scripts/tag-products.js --productIds id1,id2 --addTags moving-urgent --yes` (soporta `--removeTags` y `--dry-run`).
