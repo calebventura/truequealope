@@ -10,6 +10,7 @@ export interface UserProfile {
   department?: string | null;
   province?: string | null;
   district?: string | null;
+  aboutMe?: string | null;
   rating?: number | null;
   createdAt?: Date | { toDate: () => Date } | null;
   updatedAt?: Date | { toDate: () => Date } | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -50,50 +50,34 @@ const getDistrictFromLabel = (
 };
 
 const parseAddressFields = (address?: string | null) => {
-  if (!address) return { addressLine: "" };
+  if (!address) return {};
   const trimmed = address.trim();
-  if (!trimmed) return { addressLine: "" };
+  if (!trimmed) return {};
 
-  let addressLine = "";
-  let locationPart = trimmed;
-
-  if (trimmed.includes(" - ")) {
-    const parts = trimmed.split(" - ");
-    addressLine = parts.slice(0, -1).join(" - ").trim();
-    locationPart = parts[parts.length - 1].trim();
-  }
-
-  const tokens = locationPart
+  const tokens = trimmed
+    .replace(" - ", ",")
     .split(",")
     .map((token) => token.trim())
     .filter(Boolean);
 
-  if (tokens.length === 0) {
-    return { addressLine: addressLine || trimmed };
-  }
+  if (tokens.length === 0) return {};
 
   const department = getDepartmentFromLabel(tokens[tokens.length - 1]);
-  if (!department) {
-    return { addressLine: addressLine || trimmed };
-  }
+  if (!department) return {};
 
   let province = "";
   let district = "";
   if (tokens.length >= 3) {
     province = getProvinceFromLabel(department, tokens[tokens.length - 2]);
     district = getDistrictFromLabel(department, tokens[tokens.length - 3]);
-    const leftover = tokens.slice(0, -3).join(", ").trim();
-    if (!addressLine) addressLine = leftover;
   } else if (tokens.length >= 2) {
     province = getProvinceFromLabel(department, "");
     district = getDistrictFromLabel(department, tokens[tokens.length - 2]);
-    const leftover = tokens.slice(0, -2).join(", ").trim();
-    if (!addressLine) addressLine = leftover;
   } else {
     province = getProvinceFromLabel(department, "");
   }
 
-  return { addressLine, department, province, district };
+  return { department, province, district };
 };
 
 const resolveProfileLocation = (profile: Partial<UserProfile>) => {
@@ -111,29 +95,12 @@ const resolveProfileLocation = (profile: Partial<UserProfile>) => {
     explicitDepartment,
     profile.district ?? fallback.district ?? null
   );
-  const addressLine = (profile.addressLine ?? fallback.addressLine ?? "").trim();
 
   return {
     department: explicitDepartment,
     province,
     district,
-    addressLine,
   };
-};
-
-const buildProfileAddress = (
-  addressLine: string,
-  district: string,
-  province: string,
-  department: string
-) => {
-  const line = addressLine.trim();
-  const locationParts = [district, province, department].filter((part) => part && part.trim());
-  if (line && locationParts.length > 0) {
-    return `${line} - ${locationParts.join(", ")}`;
-  }
-  if (line) return line;
-  return locationParts.join(", ");
 };
 
 function ProfileContent() {
@@ -146,6 +113,7 @@ function ProfileContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
+  const [initialProfile, setInitialProfile] = useState<Partial<UserProfile> | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<{
@@ -155,7 +123,6 @@ function ProfileContent() {
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [addressLine, setAddressLine] = useState("");
   const provinceOptions = selectedDepartment
     ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
     : [];
@@ -177,13 +144,19 @@ function ProfileContent() {
         if (docSnap.exists()) {
           const data = docSnap.data() as UserProfile;
           setFormData(data);
+          setInitialProfile(data);
           const location = resolveProfileLocation(data);
           setSelectedDepartment(location.department ?? "");
           setSelectedProvince(location.province ?? "");
           setSelectedDistrict(location.district ?? "");
-          setAddressLine(location.addressLine ?? "");
         } else {
           setFormData({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+          });
+          setInitialProfile({
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
@@ -192,7 +165,6 @@ function ProfileContent() {
           setSelectedDepartment("");
           setSelectedProvince("");
           setSelectedDistrict("");
-          setAddressLine("");
         }
 
         if (user.photoURL) {
@@ -268,13 +240,9 @@ function ProfileContent() {
       const departmentValue = selectedDepartment || null;
       const provinceValue = selectedDepartment ? selectedProvince || null : null;
       const districtValue = selectedDepartment ? selectedDistrict || null : null;
-      const trimmedAddressLine = addressLine.trim();
-      const combinedAddress = buildProfileAddress(
-        trimmedAddressLine,
-        districtValue ?? "",
-        provinceValue ?? "",
-        departmentValue ?? ""
-      );
+      const combinedAddress = [districtValue, provinceValue, departmentValue]
+        .filter(Boolean)
+        .join(", ");
 
       const updatedData: Partial<UserProfile> = {
         ...formData,
@@ -283,7 +251,7 @@ function ProfileContent() {
         email: user.email,
         uid: user.uid,
         address: combinedAddress || null,
-        addressLine: trimmedAddressLine || null,
+        addressLine: null,
         department: departmentValue,
         province: provinceValue,
         district: districtValue,
@@ -291,7 +259,27 @@ function ProfileContent() {
 
       await setDoc(userRef, updatedData, { merge: true });
 
-      setFormData(updatedData);
+      // Confirm persistence with a fresh read
+      try {
+        const refreshedSnap = await getDoc(userRef);
+        if (refreshedSnap.exists()) {
+          const refreshed = refreshedSnap.data() as UserProfile;
+          setFormData(refreshed);
+          setInitialProfile(refreshed);
+          const refreshedLocation = resolveProfileLocation(refreshed);
+          setSelectedDepartment(refreshedLocation.department ?? "");
+          setSelectedProvince(refreshedLocation.province ?? "");
+          setSelectedDistrict(refreshedLocation.district ?? "");
+        } else {
+          setFormData(updatedData);
+          setInitialProfile(updatedData);
+        }
+      } catch (readError) {
+        console.warn("No se pudo confirmar la lectura del perfil actualizado:", readError);
+        setFormData(updatedData);
+        setInitialProfile(updatedData);
+      }
+
       setMessage({
         type: "success",
         text: "Perfil actualizado correctamente.",
@@ -310,6 +298,22 @@ function ProfileContent() {
       setSaving(false);
     }
   };
+
+  const normalize = (value?: string | null) => (value ?? "").trim();
+  const isDirty = useMemo(() => {
+    if (!initialProfile) return false;
+    const hasImageChange = Boolean(selectedImage);
+    return (
+      hasImageChange ||
+      normalize(formData.displayName) !== normalize(initialProfile.displayName) ||
+      normalize(formData.phoneNumber) !== normalize(initialProfile.phoneNumber) ||
+      normalize(formData.instagramUser) !== normalize(initialProfile.instagramUser) ||
+      normalize(formData.aboutMe) !== normalize(initialProfile.aboutMe) ||
+      normalize(formData.department) !== normalize(initialProfile.department) ||
+      normalize(formData.province) !== normalize(initialProfile.province) ||
+      normalize(formData.district) !== normalize(initialProfile.district)
+    );
+  }, [formData, initialProfile, selectedImage]);
 
   if (authLoading || loading) {
     return (
@@ -678,12 +682,33 @@ function ProfileContent() {
                   </p>
                 </div>
 
-                
+                {/* Sobre mi */}
+                <div className="sm:col-span-6">
+                  <label
+                    htmlFor="aboutMe"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Sobre mi
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      id="aboutMe"
+                      name="aboutMe"
+                      rows={4}
+                      value={formData.aboutMe || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, aboutMe: e.target.value })
+                      }
+                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
+                      placeholder="Cuenta brevemente sobre ti y cómo prefieres coordinar los trueques."
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Se mostrará en tus publicaciones para generar confianza.
+                  </p>
+                </div>
 
-  
-
-                {/* Direccion */}
-
+                {/* Ubicación */}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Departamento
@@ -740,31 +765,13 @@ function ProfileContent() {
                   </select>
                 </div>
 
-                <div className="sm:col-span-6">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Direccion
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      value={addressLine}
-                      onChange={(e) => setAddressLine(e.target.value)}
-                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
-                      placeholder="Calle, numero, referencia"
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Esta informacion ayuda a coordinar las entregas.
-                  </p>
-                </div>
-
               </div>
 
   
 
               <div className="pt-5 border-t border-gray-200 dark:border-gray-800 flex justify-end">
 
-                <Button type="submit" disabled={saving} className="w-full sm:w-auto">
+                <Button type="submit" disabled={saving || !isDirty} className="w-full sm:w-auto">
 
                   {saving ? "Guardando..." : "Guardar cambios"}
 
