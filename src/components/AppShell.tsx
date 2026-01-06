@@ -3,10 +3,19 @@
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { BottomNav } from "@/components/BottomNav";
+import { Footer } from "@/components/Footer";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideChrome = pathname.startsWith("/auth");
+  const isPrivateRoute =
+    pathname.startsWith("/products/new") ||
+    pathname.includes("/products/") && pathname.endsWith("/edit") ||
+    pathname.startsWith("/activity") ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/mis-compras");
+
+  const showFooter = !hideChrome && !isPrivateRoute;
 
   return (
     <>
@@ -19,8 +28,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         {children}
       </main>
+      {showFooter && <Footer />}
       {!hideChrome && <BottomNav />}
     </>
   );
 }
-

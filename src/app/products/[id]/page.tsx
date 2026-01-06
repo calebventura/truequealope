@@ -639,6 +639,7 @@ export default function ProductDetailPage() {
                     src={selectedImage}
                     alt={product.title}
                     fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
                     className="object-contain"
                     priority
                   />
@@ -670,6 +671,7 @@ export default function ProductDetailPage() {
                         src={img}
                         alt={`Vista ${index + 1}`}
                         fill
+                        sizes="80px"
                         className="object-cover"
                       />
                     </button>
@@ -802,6 +804,7 @@ export default function ProductDetailPage() {
                             src={sellerPhoto}
                             alt={sellerDisplayName}
                             fill
+                            sizes="56px"
                             className="object-cover"
                           />
                         ) : (
@@ -857,11 +860,31 @@ export default function ProductDetailPage() {
                         </span>
                       </div>
                     )}
-
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        Conoce más
-                      </p>
+                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                          </svg>
+                          {product.viewCount ?? 0} visitas
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setShowSellerDetails(true)}

@@ -15,7 +15,8 @@ service cloud.firestore {
     // Colección: users
     // Perfiles públicos de lectura, pero solo el dueño puede editar su info.
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      // Lectura pública para mostrar perfil de vendedor a visitantes
+      allow read: if true;
       allow write: if isOwner(userId);
     }
 
@@ -34,18 +35,9 @@ service cloud.firestore {
                     )
                     ||
                     (
-                      // Permitir incremento de viewCount por cualquier usuario (auth o anon)
+                      // Permitir actualizar viewCount (público)
                       request.resource.data.diff(resource.data).changedKeys().hasOnly(["viewCount"])
-                      &&
-                      (
-                        (!(resource.data.viewCount is int) && request.resource.data.viewCount == 1)
-                        ||
-                        (
-                          (resource.data.viewCount is int)
-                          && request.resource.data.viewCount >= resource.data.viewCount
-                          && request.resource.data.viewCount <= resource.data.viewCount + 1
-                        )
-                      )
+                      && (request.resource.data.viewCount is number)
                     );
 
       allow delete: if isAuthenticated()
