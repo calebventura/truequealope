@@ -545,7 +545,9 @@ function SellerActivity({ userId }: { userId: string }) {
                     <p className="font-semibold text-gray-900 dark:text-white">{order.productTitle}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Comprador ID: {order.buyerId.slice(0, 8)}...</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">{order.createdAt.toLocaleString()}</p>
-                    <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">S/. {order.price.toLocaleString()}</p>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                      S/. {typeof order.price === "number" ? order.price.toLocaleString() : "0"}
+                    </p>
                  </div>
                  <div className="flex gap-2 w-full md:w-auto">
                     <Button
@@ -986,7 +988,13 @@ function SellerActivity({ userId }: { userId: string }) {
             </h3>
           </div>
           <p className="text-sm text-gray-700 dark:text-gray-200">
-            Se registrará la venta por <strong>S/. {confirmOrderModal.price.toLocaleString()}</strong>. ¿Deseas continuar?
+            Se registrará la venta por{" "}
+            <strong>
+              S/.{" "}
+              {typeof confirmOrderModal.price === "number"
+                ? confirmOrderModal.price.toLocaleString()
+                : "0"}
+            </strong>. ¿Deseas continuar?
           </p>
           <div className="flex justify-end gap-3">
             <Button

@@ -52,8 +52,19 @@ function LoginContent() {
       await ensureUserProfile(userCredential.user);
       router.push(nextPath);
     } catch (e) {
-      setError("Error al iniciar sesión. Verifica tus credenciales.");
-      console.error(e);
+      const code = (e as { code?: string }).code;
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/wrong-password" ||
+        code === "auth/user-not-found"
+      ) {
+        setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Demasiados intentos fallidos. Inténtalo más tarde o restablece tu contraseña.");
+      } else {
+        setError("Error al iniciar sesión. Intenta nuevamente.");
+      }
+      console.error("Login error:", e);
     }
   };
 

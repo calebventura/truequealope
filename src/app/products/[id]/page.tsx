@@ -272,7 +272,14 @@ export default function ProductDetailPage() {
     }
     if (!product) return;
 
-    if (product.price == null) {
+    const priceToUse =
+      product.price != null
+        ? product.price
+        : isGiveaway
+        ? 0
+        : null;
+
+    if (priceToUse == null) {
       showAlert("Este producto no tiene precio de venta.", {
         tone: "info",
         title: "Precio no disponible",

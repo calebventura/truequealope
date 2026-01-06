@@ -16,8 +16,8 @@ export function Footer() {
 
   return (
     <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        <div className="space-y-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="space-y-4">
           <h3 className="text-lg font-bold text-indigo-700 dark:text-indigo-300">
             Truequealope
           </h3>
@@ -28,7 +28,7 @@ export function Footer() {
           </p>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
             Contacto
           </h4>
@@ -58,18 +58,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
-            Sobre Truequealope
-          </h4>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Creamos confianza con badges de visibilidad, métricas de contacto y
-            ubicación por comunidades. Facilita trueques, permutas o ventas con
-            rapidez y cero fricción.
-          </p>
-        </div>
-
-        <div className="space-y-3">
+        <div className="space-y-4">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
             Hub de Innovación
           </h4>
