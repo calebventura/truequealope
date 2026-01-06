@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
-import { Product, ProductMode } from "@/types/product";
+import { Product } from "@/types/product";
 import { createOrder } from "@/lib/orders";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useParams } from "next/navigation";
@@ -12,7 +12,7 @@ import Link from "next/link";
 import { CATEGORIES } from "@/lib/constants";
 import { logContactClick, getContactClicksCount } from "@/lib/contact";
 import { UserProfile } from "@/types/user";
-import { COMMUNITIES, getCommunityById } from "@/lib/communities";
+import { getCommunityById } from "@/lib/communities";
 import { createPermutaOffer } from "@/lib/offers";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 
@@ -925,7 +925,7 @@ export default function ProductDetailPage() {
 
                       <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900 transition-colors">
                         <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          Clics en "Contactar" (WhatsApp)
+                          Clics en &quot;Contactar&quot; (WhatsApp)
                         </p>
                         <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                           {contactClicks !== null ? contactClicks : "—"}

@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
-import { buildTrendHref, getActiveTrends } from "@/lib/trends";
+import {
+  TrendConfig,
+  getActiveTrends,
+  getTrendById,
+  isTrendActive,
+} from "@/lib/trends";
 import {
   ExchangeFilter,
   ListingFilter,
@@ -17,6 +22,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { ImageCarousel } from "@/components/ui/ImageCarousel";
+import { FiltersPanel } from "@/components/FiltersPanel";
 import {
   COMMUNITIES,
   getCommunityById,
@@ -28,11 +34,21 @@ export default function HomePage() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exchangeFilter, setExchangeFilter] = useState<ExchangeFilter>("all");
-  const [listingFilter, setListingFilter] = useState<ListingFilter>("all");
-  const [communityFilter, setCommunityFilter] = useState<string>("all");
-  const trends = getActiveTrends();
+  const [exchangeFilters, setExchangeFilters] = useState<ExchangeFilter[]>([]);
+  const [listingFilters, setListingFilters] = useState<ListingFilter[]>([]);
+  const [communityFilters, setCommunityFilters] = useState<string[]>([]);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [trendFilters, setTrendFilters] = useState<string[]>([]);
+  const trendOptions = getActiveTrends();
   const nowTimestamp = Date.now();
+  const activeTrends = useMemo(() => {
+    if (trendFilters.length === 0) return [];
+    return trendFilters
+      .map((trendId) => getTrendById(trendId))
+      .filter(
+        (trend): trend is TrendConfig => Boolean(trend && isTrendActive(trend))
+      );
+  }, [trendFilters]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -88,20 +104,207 @@ export default function HomePage() {
     fetchProducts();
   }, [user]);
 
-  const communityFiltered = products.filter((product) => {
-    if (communityFilter === "all") return true;
-    if (communityFilter === "public") {
-      return (product.visibility ?? "public") !== "community";
+  const matchesTrend = (product: Product, trend: TrendConfig) => {
+    const { filters, productIds } = trend;
+
+    if (productIds && productIds.length > 0) {
+      if (!product.id || !productIds.includes(product.id)) return false;
     }
-    return product.communityId === communityFilter;
+
+    if (filters?.categoryId && product.categoryId !== filters.categoryId) {
+      return false;
+    }
+
+    if (filters?.categoryIds && filters.categoryIds.length > 0) {
+      if (!filters.categoryIds.includes(product.categoryId)) return false;
+    }
+
+    if (filters?.condition && product.condition !== filters.condition) {
+      return false;
+    }
+
+    if (
+      filters?.listingType &&
+      (product.listingType ?? "product") !== filters.listingType
+    ) {
+      return false;
+    }
+
+    if (filters?.trendTagsAny && filters.trendTagsAny.length > 0) {
+      const tags = product.trendTags ?? [];
+      const matchesTag = tags.some((tag) => filters.trendTagsAny?.includes(tag));
+      if (!matchesTag) return false;
+    }
+
+    if (filters?.exchangeTypesAny && filters.exchangeTypesAny.length > 0) {
+      const accepted = getAcceptedExchangeTypes(product);
+      const matchesType = filters.exchangeTypesAny.some((type) =>
+        accepted.includes(type)
+      );
+      if (!matchesType) return false;
+    }
+
+    if (filters?.searchQuery) {
+      const lowerQuery = filters.searchQuery.toLowerCase();
+      const matchesQuery =
+        product.title.toLowerCase().includes(lowerQuery) ||
+        product.description.toLowerCase().includes(lowerQuery);
+      if (!matchesQuery) return false;
+    }
+
+    return true;
+  };
+
+  const applyTrendFilters = (items: Product[]) => {
+    if (activeTrends.length === 0) return items;
+    return items.filter((product) =>
+      activeTrends.some((trend) => matchesTrend(product, trend))
+    );
+  };
+
+  const trendFiltered = applyTrendFilters(products);
+  const categoryFiltered =
+    categoryFilters.length === 0
+      ? trendFiltered
+      : trendFiltered.filter((product) =>
+          categoryFilters.includes(product.categoryId)
+        );
+
+  const includePublic = communityFilters.includes("public");
+  const communityIds = new Set(
+    communityFilters.filter((value) => value !== "public")
+  );
+  const communityFiltered = categoryFiltered.filter((product) => {
+    if (communityFilters.length === 0) return true;
+    const isPublic = (product.visibility ?? "public") !== "community";
+    if (includePublic && isPublic) return true;
+    if (product.communityId && communityIds.has(product.communityId)) return true;
+    return false;
   });
 
   const exchangeFiltered = communityFiltered.filter((product) =>
-    matchesExchangeFilter(product, exchangeFilter)
+    exchangeFilters.length === 0
+      ? true
+      : exchangeFilters.some((filter) => matchesExchangeFilter(product, filter))
   );
   const filteredProducts = exchangeFiltered.filter((product) =>
-    matchesListingFilter(product, listingFilter)
+    listingFilters.length === 0
+      ? true
+      : listingFilters.some((filter) => matchesListingFilter(product, filter))
   );
+
+  const exchangeLabels: Record<ExchangeFilter, string> = {
+    all: "Todos",
+    sale: "Venta",
+    trade: "Trueque",
+    permuta: "Permuta",
+    giveaway: "Regalo",
+  };
+  const listingLabels: Record<ListingFilter, string> = {
+    all: "Todos",
+    product: "Producto",
+    service: "Servicio",
+  };
+
+  const formatSelectionLabel = (
+    values: string[],
+    labelForValue: (value: string) => string,
+    fallback: string
+  ) => {
+    if (values.length === 0) return fallback;
+    const labels = values.map(labelForValue);
+    if (labels.length <= 2) return labels.join(", ");
+    return `${labels[0]} +${labels.length - 1}`;
+  };
+
+  const formatFilterLabels = <T extends string>(
+    values: T[],
+    labels: Record<T, string>,
+    fallback: string
+  ) => {
+    if (values.length === 0) return fallback;
+    const names = values.map((value) => labels[value]);
+    if (names.length <= 2) return names.join(", ");
+    return `${names[0]} +${names.length - 1}`;
+  };
+
+  const communityLabel = formatSelectionLabel(
+    communityFilters,
+    (value) =>
+      value === "public"
+        ? "Publico"
+        : COMMUNITIES.find((community) => community.id === value)?.name ??
+          "Comunidad",
+    "Todas"
+  );
+  const categoryLabel = formatSelectionLabel(
+    categoryFilters,
+    (value) =>
+      CATEGORIES.find((category) => category.id === value)?.name ?? "Categoria",
+    "Todas"
+  );
+  const trendLabel = formatSelectionLabel(
+    trendFilters,
+    (value) => getTrendById(value)?.title ?? "Tendencia",
+    "Todas"
+  );
+  const exchangeLabel = formatFilterLabels(
+    exchangeFilters,
+    exchangeLabels,
+    exchangeLabels.all
+  );
+  const listingLabel = formatFilterLabels(
+    listingFilters,
+    listingLabels,
+    listingLabels.all
+  );
+
+  const activeFilterCount =
+    (categoryFilters.length > 0 ? 1 : 0) +
+    (trendFilters.length > 0 ? 1 : 0) +
+    (communityFilters.length > 0 ? 1 : 0) +
+    (exchangeFilters.length > 0 ? 1 : 0) +
+    (listingFilters.length > 0 ? 1 : 0);
+
+  const activeFilterPills = [
+    categoryFilters.length > 0 && {
+      key: "category",
+      label: `Categoria: ${categoryLabel}`,
+      onClear: () => setCategoryFilters([]),
+    },
+    trendFilters.length > 0 && {
+      key: "trend",
+      label: `Tendencia: ${trendLabel}`,
+      onClear: () => setTrendFilters([]),
+    },
+    communityFilters.length > 0 && {
+      key: "community",
+      label: `Comunidad: ${communityLabel}`,
+      onClear: () => setCommunityFilters([]),
+    },
+    exchangeFilters.length > 0 && {
+      key: "exchange",
+      label: `Intercambio: ${exchangeLabel}`,
+      onClear: () => setExchangeFilters([]),
+    },
+    listingFilters.length > 0 && {
+      key: "listing",
+      label: `Publicacion: ${listingLabel}`,
+      onClear: () => setListingFilters([]),
+    },
+  ].filter(Boolean) as Array<{
+    key: string;
+    label: string;
+    onClear: () => void;
+  }>;
+
+  const clearAllFilters = () => {
+    setCategoryFilters([]);
+    setTrendFilters([]);
+    setCommunityFilters([]);
+    setExchangeFilters([]);
+    setListingFilters([]);
+  };
 
   if (loading) {
     return (
@@ -138,218 +341,52 @@ export default function HomePage() {
           </div>
         </section>
 
-        {trends.length > 0 && (
-          <section className="mb-12">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Tendencias
-              </h2>
-              <Link
-                href="/search"
-                className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500"
-              >
-                Ver todas
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {trends.map((trend) => (
-                <Link
-                  key={trend.id}
-                  href={buildTrendHref(trend)}
-                  className="group rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white to-indigo-50 dark:from-gray-900 dark:to-indigo-950/40 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {trend.title}
-                      </p>
-                      {trend.subtitle && (
-                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                          {trend.subtitle}
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-2xl text-indigo-600 dark:text-indigo-300">
-                      {trend.icon ?? "#"}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
 
-        {/* Categorías */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Categorías
-          </h2>
-          <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-hide snap-x snap-mandatory">
-            {CATEGORIES.map((category) => (
-              <Link
-                key={category.id}
-                href={`/search?category=${category.id}`}
-                className="flex-shrink-0 w-32 h-32 bg-white dark:bg-gray-900 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 hover:shadow-md transition-all border border-gray-100 dark:border-gray-800 snap-start"
-              >
-                <span className="text-3xl">{category.icon}</span>
-                <span className="font-medium text-gray-900 dark:text-gray-200 text-sm text-center px-2">
-                  {category.name}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
+        <FiltersPanel
+          title="Productos recientes"
+          activeCount={activeFilterCount}
+          pills={activeFilterPills}
+          onClearAll={clearAllFilters}
+          category={{
+            values: categoryFilters,
+            options: CATEGORIES,
+            onApply: setCategoryFilters,
+          }}
+          trend={{
+            values: trendFilters,
+            options: trendOptions,
+            onApply: setTrendFilters,
+          }}
+          community={{
+            values: communityFilters,
+            options: [
+              { id: "all", name: "Todas" },
+              { id: "public", name: "Publico" },
+              ...COMMUNITIES,
+            ],
+            onApply: setCommunityFilters,
+          }}
+          exchange={{
+            values: exchangeFilters,
+            labels: exchangeLabels,
+            onApply: setExchangeFilters,
+          }}
+          listing={{
+            values: listingFilters,
+            labels: listingLabels,
+            onApply: setListingFilters,
+          }}
+        />
 
-        {/* Header + filtros */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Productos recientes
-            </h2>
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Filtra por comunidad
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "all", name: "Todas" },
-                  { id: "public", name: "Público" },
-                  ...COMMUNITIES,
-                ].map((community) => {
-                  const active = communityFilter === community.id;
-                  return (
-                    <button
-                      key={community.id}
-                      type="button"
-                      onClick={() => setCommunityFilter(community.id)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                        active
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-indigo-400"
-                      }`}
-                    >
-                      {community.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Tipo de intercambio
-            </span>
-            <div className="flex flex-wrap rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors gap-1">
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("all")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "all"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("sale")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "sale"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Venta
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("trade")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "trade"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Trueque
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("permuta")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "permuta"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Permuta
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("giveaway")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "giveaway"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Regalo
-              </button>
-            </div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Tipo de publicacion
-            </span>
-            <div className="flex flex-wrap rounded-lg bg-white dark:bg-gray-900 p-1 border dark:border-gray-800 shadow-sm w-fit transition-colors gap-1">
-              <button
-                type="button"
-                onClick={() => setListingFilter("all")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  listingFilter === "all"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setListingFilter("product")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  listingFilter === "product"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Producto
-              </button>
-              <button
-                type="button"
-                onClick={() => setListingFilter("service")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  listingFilter === "service"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                Servicio
-              </button>
-            </div>
-          </div>
-        </div>
-
-{filteredProducts.length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-sm dark:border dark:border-gray-800 transition-colors">
             <p className="text-gray-500 dark:text-gray-400 text-lg">
               No hay productos para este filtro.
             </p>
-            {(exchangeFilter !== "all" || listingFilter !== "all") && (
+            {activeFilterCount > 0 && (
               <button
                 type="button"
-                onClick={() => {
-                  setExchangeFilter("all");
-                  setListingFilter("all");
-                }}
+                onClick={clearAllFilters}
                 className="mt-3 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium"
               >
                 Ver todos

@@ -1,7 +1,23 @@
 
 import { adminDb } from '@/lib/firebaseAdmin';
-import { Product } from '@/types/product';
+import { Product, TimestampLike } from '@/types/product';
 import * as admin from 'firebase-admin';
+
+const resolveTimestamp = (value: TimestampLike | null | undefined) => {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  if (typeof value === "object" && "toDate" in value) {
+    const maybeTimestamp = value as { toDate?: () => Date };
+    if (typeof maybeTimestamp.toDate === "function") {
+      return maybeTimestamp.toDate();
+    }
+  }
+  return undefined;
+};
 
 export class OrderService {
   static async createOrder(buyerId: string, productId: string) {
@@ -18,15 +34,7 @@ export class OrderService {
       
       if (productData.status === 'reserved') {
           // Lazy Validation: Check expiration
-          let reservedAt: Date | undefined;
-          
-          if (productData.reservedAt && typeof (productData.reservedAt as any).toDate === 'function') {
-              reservedAt = (productData.reservedAt as any).toDate();
-          } else if (productData.reservedAt instanceof Date) {
-              reservedAt = productData.reservedAt;
-          } else if (productData.reservedAt) {
-              reservedAt = new Date(productData.reservedAt as any);
-          }
+          const reservedAt = resolveTimestamp(productData.reservedAt);
 
           if (reservedAt && !isNaN(reservedAt.getTime())) {
               const now = new Date();
@@ -79,6 +87,7 @@ export class OrderService {
 
           const productRef = adminDb.collection('products').doc(orderData.productId);
           const productSnap = await tx.get(productRef);
+          if (!productSnap.exists) throw new Error("Product not found");
           
           // Rule 1: Confirm -> SOLD
           tx.update(orderRef, { status: 'completed' });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
@@ -14,12 +14,6 @@ export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -94,9 +88,7 @@ export const Navbar = () => {
               className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
               aria-label="Toggle Dark Mode"
             >
-              {!mounted ? (
-                <div className="w-5 h-5" />
-              ) : theme === "light" ? (
+              {theme === "light" ? (
                 // Moon icon for light mode
                 <svg
                   className="w-5 h-5"
@@ -180,7 +172,7 @@ export const Navbar = () => {
                     className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Publicar
+                    Publicar ahora
                   </Link>
                   <Link
                     href="/activity?tab=seller"

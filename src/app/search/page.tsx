@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { collection, query, where, getDocs, QueryConstraint } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
 import { CATEGORIES } from "@/lib/constants";
-import { getTrendById, isTrendActive } from "@/lib/trends";
+import {
+  TrendConfig,
+  getActiveTrends,
+  getTrendById,
+  isTrendActive,
+} from "@/lib/trends";
 import {
   ExchangeFilter,
   ListingFilter,
@@ -18,6 +23,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ImageCarousel } from "@/components/ui/ImageCarousel";
 import { useAuth } from "@/hooks/useAuth";
+import { FiltersPanel } from "@/components/FiltersPanel";
 import {
   COMMUNITIES,
   getCommunityById,
@@ -31,109 +37,225 @@ function SearchContent() {
   const { user, loading: authLoading } = useAuth();
 
   const initialQuery = searchParams.get("q") || "";
-  const initialCategory = searchParams.get("category") || "";
-  const trendId = searchParams.get("trend") || "";
 
   const [searchTerm, setSearchTerm] = useState(initialQuery);
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [exchangeFilter, setExchangeFilter] = useState<ExchangeFilter>("all");
-  const [listingFilter, setListingFilter] = useState<ListingFilter>("all");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTrends, setSelectedTrends] = useState<string[]>([]);
+  const [exchangeFilters, setExchangeFilters] = useState<ExchangeFilter[]>([]);
+  const [listingFilters, setListingFilters] = useState<ListingFilter[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [communityFilter, setCommunityFilter] = useState<string>("all");
+  const [communityFilters, setCommunityFilters] = useState<string[]>([]);
   const nowTimestamp = Date.now();
 
-  const activeTrend = useMemo(() => {
-    if (!trendId) return null;
-    const trend = getTrendById(trendId);
-    if (!trend || !isTrendActive(trend)) return null;
-    return trend;
-  }, [trendId]);
+  const activeTrends = useMemo(() => {
+    if (selectedTrends.length === 0) return [];
+    return selectedTrends
+      .map((trendId) => getTrendById(trendId))
+      .filter(
+        (trend): trend is TrendConfig => Boolean(trend && isTrendActive(trend))
+      );
+  }, [selectedTrends]);
+  const trendOptions = getActiveTrends();
 
   useEffect(() => {
     setSearchTerm(searchParams.get("q") || "");
-    setSelectedCategory(searchParams.get("category") || "");
   }, [searchParams]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (activeTrend) params.set("trend", activeTrend.id);
     if (searchTerm) params.set("q", searchTerm);
-    if (selectedCategory) params.set("category", selectedCategory);
-    router.push(`/search?${params.toString()}`);
+    const queryString = params.toString();
+    router.push(queryString ? `/search?${queryString}` : "/search");
   };
 
-  const applyTrendFilters = (items: Product[]) => {
-    if (!activeTrend) return items;
+  const applyTrendFilters = useCallback(
+    (items: Product[]) => {
+      if (activeTrends.length === 0) return items;
 
-    const { filters, productIds } = activeTrend;
-    let filtered = items;
+      const matchesTrend = (product: Product, trend: TrendConfig) => {
+        const { filters, productIds } = trend;
 
-    if (productIds && productIds.length > 0) {
-      const idSet = new Set(productIds);
-      filtered = filtered.filter((product) => product.id && idSet.has(product.id));
-    }
+        if (productIds && productIds.length > 0) {
+          if (!product.id || !productIds.includes(product.id)) return false;
+        }
 
-    if (filters?.categoryId) {
-      filtered = filtered.filter((product) => product.categoryId === filters.categoryId);
-    }
+        if (filters?.categoryId && product.categoryId !== filters.categoryId) {
+          return false;
+        }
 
-    if (filters?.categoryIds && filters.categoryIds.length > 0) {
-      const categorySet = new Set(filters.categoryIds);
-      filtered = filtered.filter((product) => categorySet.has(product.categoryId));
-    }
+        if (filters?.categoryIds && filters.categoryIds.length > 0) {
+          if (!filters.categoryIds.includes(product.categoryId)) return false;
+        }
 
-    if (filters?.condition) {
-      filtered = filtered.filter((product) => product.condition === filters.condition);
-    }
+        if (filters?.condition && product.condition !== filters.condition) {
+          return false;
+        }
 
-    if (filters?.listingType) {
-      filtered = filtered.filter(
-        (product) => (product.listingType ?? "product") === filters.listingType
+        if (
+          filters?.listingType &&
+          (product.listingType ?? "product") !== filters.listingType
+        ) {
+          return false;
+        }
+
+        if (filters?.trendTagsAny && filters.trendTagsAny.length > 0) {
+          const tags = product.trendTags ?? [];
+          const matchesTag = tags.some((tag) => filters.trendTagsAny?.includes(tag));
+          if (!matchesTag) return false;
+        }
+
+        if (filters?.exchangeTypesAny && filters.exchangeTypesAny.length > 0) {
+          const accepted = getAcceptedExchangeTypes(product);
+          const matchesType = filters.exchangeTypesAny.some((type) =>
+            accepted.includes(type)
+          );
+          if (!matchesType) return false;
+        }
+
+        if (filters?.searchQuery) {
+          const lowerQuery = filters.searchQuery.toLowerCase();
+          const matchesQuery =
+            product.title.toLowerCase().includes(lowerQuery) ||
+            product.description.toLowerCase().includes(lowerQuery);
+          if (!matchesQuery) return false;
+        }
+
+        return true;
+      };
+
+      return items.filter((product) =>
+        activeTrends.some((trend) => matchesTrend(product, trend))
       );
-    }
+    },
+    [activeTrends]
+  );
 
-    if (filters?.trendTagsAny && filters.trendTagsAny.length > 0) {
-      const tagSet = new Set(filters.trendTagsAny);
-      filtered = filtered.filter((product) => {
-        const tags = product.trendTags ?? [];
-        return tags.some((tag) => tagSet.has(tag));
-      });
-    }
-
-    if (filters?.exchangeTypesAny && filters.exchangeTypesAny.length > 0) {
-      filtered = filtered.filter((product) => {
-        const accepted = getAcceptedExchangeTypes(product);
-        return filters.exchangeTypesAny?.some((type) => accepted.includes(type));
-      });
-    }
-
-    if (filters?.searchQuery) {
-      const lowerQuery = filters.searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (product) =>
-          product.title.toLowerCase().includes(lowerQuery) ||
-          product.description.toLowerCase().includes(lowerQuery)
-      );
-    }
-
-    return filtered;
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setSelectedCategories([]);
+    setSelectedTrends([]);
+    setCommunityFilters([]);
+    setExchangeFilters([]);
+    setListingFilters([]);
+    router.push("/search");
   };
+
+  const exchangeLabels: Record<ExchangeFilter, string> = {
+    all: "Todos",
+    sale: "Venta",
+    trade: "Trueque",
+    permuta: "Permuta",
+    giveaway: "Regalo",
+  };
+  const listingLabels: Record<ListingFilter, string> = {
+    all: "Todos",
+    product: "Producto",
+    service: "Servicio",
+  };
+
+  const formatSelectionLabel = (
+    values: string[],
+    labelForValue: (value: string) => string,
+    fallback: string
+  ) => {
+    if (values.length === 0) return fallback;
+    const labels = values.map(labelForValue);
+    if (labels.length <= 2) return labels.join(", ");
+    return `${labels[0]} +${labels.length - 1}`;
+  };
+
+  const formatFilterLabels = <T extends string>(
+    values: T[],
+    labels: Record<T, string>,
+    fallback: string
+  ) => {
+    if (values.length === 0) return fallback;
+    const names = values.map((value) => labels[value]);
+    if (names.length <= 2) return names.join(", ");
+    return `${names[0]} +${names.length - 1}`;
+  };
+
+  const communityLabel = formatSelectionLabel(
+    communityFilters,
+    (value) =>
+      value === "public"
+        ? "Publico"
+        : COMMUNITIES.find((community) => community.id === value)?.name ??
+          "Comunidad",
+    "Todas"
+  );
+  const categoryLabel = formatSelectionLabel(
+    selectedCategories,
+    (value) =>
+      CATEGORIES.find((category) => category.id === value)?.name ?? "Categoria",
+    "Todas"
+  );
+  const trendLabel = formatSelectionLabel(
+    selectedTrends,
+    (value) => getTrendById(value)?.title ?? "Tendencia",
+    "Todas"
+  );
+  const exchangeLabel = formatFilterLabels(
+    exchangeFilters,
+    exchangeLabels,
+    exchangeLabels.all
+  );
+  const listingLabel = formatFilterLabels(
+    listingFilters,
+    listingLabels,
+    listingLabels.all
+  );
+
+  const activeFilterCount =
+    (selectedCategories.length > 0 ? 1 : 0) +
+    (selectedTrends.length > 0 ? 1 : 0) +
+    (communityFilters.length > 0 ? 1 : 0) +
+    (exchangeFilters.length > 0 ? 1 : 0) +
+    (listingFilters.length > 0 ? 1 : 0);
+
+  const activeFilterPills = [
+    selectedCategories.length > 0 && {
+      key: "category",
+      label: `Categoria: ${categoryLabel}`,
+      onClear: () => setSelectedCategories([]),
+    },
+    selectedTrends.length > 0 && {
+      key: "trend",
+      label: `Tendencia: ${trendLabel}`,
+      onClear: () => setSelectedTrends([]),
+    },
+    communityFilters.length > 0 && {
+      key: "community",
+      label: `Comunidad: ${communityLabel}`,
+      onClear: () => setCommunityFilters([]),
+    },
+    exchangeFilters.length > 0 && {
+      key: "exchange",
+      label: `Intercambio: ${exchangeLabel}`,
+      onClear: () => setExchangeFilters([]),
+    },
+    listingFilters.length > 0 && {
+      key: "listing",
+      label: `Publicacion: ${listingLabel}`,
+      onClear: () => setListingFilters([]),
+    },
+  ].filter(Boolean) as Array<{
+    key: string;
+    label: string;
+    onClear: () => void;
+  }>;
+
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const constraints: QueryConstraint[] = [
-           where("status", "in", ["active", "reserved", "sold"])
-        ];
-
-        if (selectedCategory) {
-          constraints.push(where("categoryId", "==", selectedCategory));
-        }
-
-        const q = query(collection(db, "products"), ...constraints);
+        const q = query(
+          collection(db, "products"),
+          where("status", "in", ["active", "reserved", "sold"])
+        );
         const querySnapshot = await getDocs(q);
 
         let results = querySnapshot.docs.map((docSnap) => ({
@@ -143,7 +265,7 @@ function SearchContent() {
             ? docSnap.data().createdAt.toDate()
             : new Date(),
           soldAt: docSnap.data().soldAt?.toDate
-              ? docSnap.data().soldAt.toDate()
+             ? docSnap.data().soldAt.toDate()
               : docSnap.data().soldAt ? new Date(docSnap.data().soldAt) : undefined,
         })) as Product[];
 
@@ -157,17 +279,6 @@ function SearchContent() {
              }
              return true;
         });
-
-        results = applyTrendFilters(results);
-
-        if (searchTerm) {
-          const lowerTerm = searchTerm.toLowerCase();
-          results = results.filter(
-            (p) =>
-              p.title.toLowerCase().includes(lowerTerm) ||
-              p.description.toLowerCase().includes(lowerTerm)
-          );
-        }
 
         results.sort((a, b) => {
             // Priority: Active/Reserved (0) < Sold (1)
@@ -188,22 +299,61 @@ function SearchContent() {
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory, user, authLoading, activeTrend]);
+  }, [user, authLoading]);
 
-  const filteredByCommunity = products.filter((product) => {
-    if (communityFilter === "all") return true;
-    if (communityFilter === "public") {
-      return (product.visibility ?? "public") !== "community";
+  const filteredProducts = useMemo(() => {
+    let filtered = applyTrendFilters(products);
+
+    if (selectedCategories.length > 0) {
+      const categorySet = new Set(selectedCategories);
+      filtered = filtered.filter((product) => categorySet.has(product.categoryId));
     }
-    return product.communityId === communityFilter;
-  });
 
-  const exchangeFiltered = filteredByCommunity.filter((product) =>
-    matchesExchangeFilter(product, exchangeFilter)
-  );
-  const filteredProducts = exchangeFiltered.filter((product) =>
-    matchesListingFilter(product, listingFilter)
-  );
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (product) =>
+          product.title.toLowerCase().includes(lowerTerm) ||
+          product.description.toLowerCase().includes(lowerTerm)
+      );
+    }
+
+    if (communityFilters.length > 0) {
+      const includePublic = communityFilters.includes("public");
+      const communityIds = new Set(
+        communityFilters.filter((value) => value !== "public")
+      );
+
+      filtered = filtered.filter((product) => {
+        const isPublic = (product.visibility ?? "public") !== "community";
+        if (includePublic && isPublic) return true;
+        if (product.communityId && communityIds.has(product.communityId)) return true;
+        return false;
+      });
+    }
+
+    if (exchangeFilters.length > 0) {
+      filtered = filtered.filter((product) =>
+        exchangeFilters.some((filter) => matchesExchangeFilter(product, filter))
+      );
+    }
+
+    if (listingFilters.length > 0) {
+      filtered = filtered.filter((product) =>
+        listingFilters.some((filter) => matchesListingFilter(product, filter))
+      );
+    }
+
+    return filtered;
+  }, [
+    products,
+    applyTrendFilters,
+    selectedCategories,
+    searchTerm,
+    communityFilters,
+    exchangeFilters,
+    listingFilters,
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 transition-colors duration-300">
@@ -214,187 +364,63 @@ function SearchContent() {
 
         {/* Filtros */}
         <div className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm mb-8 space-y-4 dark:border dark:border-gray-800 transition-colors">
-          {activeTrend && (
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 px-3 py-1 font-medium text-indigo-800 dark:text-indigo-200">
-                Tendencia: {activeTrend.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => router.push("/search")}
-                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium"
-              >
-                Quitar
-              </button>
-            </div>
-          )}
-                    <form
-            onSubmit={handleSearch}
-            className="flex flex-col gap-4"
-          >
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  id="search"
-                  placeholder="¿Qué estás buscando?"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-4 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
-                />
+          <div className="flex flex-col gap-4">
+            <form onSubmit={handleSearch} className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    id="search"
+                    placeholder="Que estas buscando?"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-4 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full md:w-auto bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors font-medium"
+                >
+                  Buscar
+                </button>
               </div>
-              <button
-                type="submit"
-                className="w-full md:w-auto bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors font-medium"
-              >
-                Buscar
-              </button>
-            </div>
+            </form>
 
-            <div className="flex flex-col gap-3">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Comunidad</span>
-              <div className="flex flex-wrap gap-2">
-                {[
+            <FiltersPanel
+              activeCount={activeFilterCount}
+              pills={activeFilterPills}
+              onClearAll={clearAllFilters}
+              emptyLabel="Sin filtros activos"
+              category={{
+                values: selectedCategories,
+                options: CATEGORIES,
+                onApply: setSelectedCategories,
+              }}
+              trend={{
+                values: selectedTrends,
+                options: trendOptions,
+                onApply: setSelectedTrends,
+              }}
+              community={{
+                values: communityFilters,
+                options: [
                   { id: "all", name: "Todas" },
-                  { id: "public", name: "Público" },
+                  { id: "public", name: "Publico" },
                   ...COMMUNITIES,
-                ].map((community) => {
-                  const active = communityFilter === community.id;
-                  return (
-                    <button
-                      key={community.id}
-                      type="button"
-                      onClick={() => setCommunityFilter(community.id)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                        active
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-indigo-400"
-                      }`}
-                    >
-                      {community.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="w-full md:w-48">
-              <select
-                id="category"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
-              >
-                <option value="">Todas las categorías</option>
-                {CATEGORIES.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </form>
-
-
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Tipo de intercambio
-            </span>
-            <div className="flex flex-wrap rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors gap-1">
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("all")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "all"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("sale")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "sale"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Venta
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("trade")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "trade"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Trueque
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("permuta")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "permuta"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Permuta
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeFilter("giveaway")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  exchangeFilter === "giveaway"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Regalo
-              </button>
-            </div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Tipo de publicacion
-            </span>
-            <div className="flex flex-wrap rounded-lg bg-gray-50 dark:bg-gray-800 p-1 border dark:border-gray-700 w-fit transition-colors gap-1">
-              <button
-                type="button"
-                onClick={() => setListingFilter("all")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  listingFilter === "all"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setListingFilter("product")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  listingFilter === "product"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Producto
-              </button>
-              <button
-                type="button"
-                onClick={() => setListingFilter("service")}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  listingFilter === "service"
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                Servicio
-              </button>
-            </div>
+                ],
+                onApply: setCommunityFilters,
+              }}
+              exchange={{
+                values: exchangeFilters,
+                labels: exchangeLabels,
+                onApply: setExchangeFilters,
+              }}
+              listing={{
+                values: listingFilters,
+                labels: listingLabels,
+                onApply: setListingFilters,
+              }}
+            />
           </div>
         </div>
 
@@ -422,18 +448,11 @@ function SearchContent() {
               No se encontraron productos
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Intenta con otros términos, categorías o filtros.
+              Intenta con otros terminos, categorias o filtros.
             </p>
             <div className="mt-6">
               <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("");
-                  setExchangeFilter("all");
-                  setListingFilter("all");
-                  setCommunityFilter("all");
-                  router.push("/search");
-                }}
+                onClick={clearAllFilters}
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium"
               >
                 Limpiar filtros

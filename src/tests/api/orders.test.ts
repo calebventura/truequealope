@@ -30,7 +30,7 @@ describe('POST /api/orders (Order Creation Logic)', () => {
   const mockProductId = 'product-789';
   const mockPrice = 100;
   
-  let mockTx: any;
+  let mockTx: { get: jest.Mock; set: jest.Mock; update: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,7 +52,7 @@ describe('POST /api/orders (Order Creation Logic)', () => {
     });
   });
 
-  const createRequest = (body: any) => {
+  const createRequest = (body: Record<string, unknown>) => {
     return new Request('http://localhost:3000/api/orders', {
       method: 'POST',
       headers: { Authorization: 'Bearer valid-token' },
@@ -78,8 +78,6 @@ describe('POST /api/orders (Order Creation Logic)', () => {
 
     // 3. Execute
     const response = await POST(createRequest({ productId: mockProductId }));
-    const data = await response.json();
-
     // 4. Assert Success Response
     expect(response.status).toBe(200);
 

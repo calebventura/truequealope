@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebaseAdmin";
+import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
 import { ProductService } from "@/lib/services/productService";
 import { Product } from "@/types/product";
 
@@ -29,7 +29,6 @@ export async function PUT(
     
     // Actually, I'll update ProductService to fetch it if needed, or fetch here.
     // I'll fetch here using Admin SDK.
-    const { adminDb } = require("@/lib/firebaseAdmin");
     const productSnap = await adminDb.collection("products").doc(id).get();
     
     if (!productSnap.exists) {

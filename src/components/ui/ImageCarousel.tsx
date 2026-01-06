@@ -40,7 +40,7 @@ export function ImageCarousel({ images, alt }: ImageCarouselProps) {
     touchEndX.current = e.targetTouches[0].clientX;
   };
 
-  const onTouchEnd = (e: React.TouchEvent) => {
+  const onTouchEnd = () => {
     if (!touchStartX.current || !touchEndX.current) return;
     
     const distance = touchStartX.current - touchEndX.current;

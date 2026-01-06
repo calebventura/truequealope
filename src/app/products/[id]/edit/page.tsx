@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebaseClient";
+import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Product } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";

@@ -21,7 +21,8 @@ const createMockDoc = (collectionPath: string, id: string) => ({
   set: jest.fn(),
 });
 
-const mockDocRefs: Record<string, any> = {};
+type MockDoc = ReturnType<typeof createMockDoc>;
+const mockDocRefs: Record<string, MockDoc> = {};
 
 const getDocRef = (collectionPath: string, id: string) => {
   const fullPath = `${collectionPath}/${id}`;
@@ -33,7 +34,8 @@ const getDocRef = (collectionPath: string, id: string) => {
 
 jest.mock('@/lib/firebaseAdmin', () => ({
   adminDb: {
-    runTransaction: (cb: any) => mockRunTransaction(cb),
+    runTransaction: (cb: (tx: typeof mockTransaction) => unknown) =>
+      mockRunTransaction(cb),
     collection: jest.fn((col) => ({
       doc: jest.fn((id) => getDocRef(col, id || 'new-id')),
     })),

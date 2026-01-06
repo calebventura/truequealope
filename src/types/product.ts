@@ -1,7 +1,15 @@
+import type { FieldValue } from "firebase/firestore";
+
 export type ProductMode = "sale" | "trade" | "both";
 export type ListingType = "product" | "service";
 export type ExchangeType = "money" | "product" | "service" | "exchange_plus_cash" | "giveaway";
 export type ProductVisibility = "public" | "community";
+export type TimestampLike =
+  | Date
+  | { toDate: () => Date }
+  | string
+  | number
+  | FieldValue;
 
 export interface Product {
   id?: string;
@@ -18,8 +26,8 @@ export interface Product {
   condition: "new" | "used" | "like-new";
   location: string;
   createdAt: Date;
-  reservedAt?: any; // Using any for flexibility with Firestore Timestamp vs Date, or import Timestamp
-  soldAt?: any;
+  reservedAt?: TimestampLike | null;
+  soldAt?: TimestampLike | null;
   /**
    * Modo de publicación:
    * - sale: solo venta
@@ -57,7 +65,7 @@ export interface Product {
   finalBuyerContact?: string | null;
   finalDealPrice?: number | null;
   finalDealItems?: string | null;
-  finalizedAt?: any;
+  finalizedAt?: TimestampLike | null;
   searchKeywords?: string[];
 
   // Nuevos campos Release 1.0

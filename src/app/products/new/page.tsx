@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   collection,
   addDoc,
@@ -15,7 +16,7 @@ import {
 import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/storage";
-import { Product, ListingType, ExchangeType } from "@/types/product";
+import { Product, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS, DRAFT_KEY } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
 import { COMMUNITIES } from "@/lib/communities";
@@ -248,7 +249,7 @@ export default function NewProductPage() {
   };
 
   const handleExchangeTypeChange = (type: ExchangeType, checked: boolean) => {
-    let current = new Set(acceptedExchangeTypes || []);
+    const current = new Set(acceptedExchangeTypes || []);
 
     if (checked) {
       // Reglas de exclusividad
@@ -457,11 +458,14 @@ export default function NewProductPage() {
               <div className="mb-4 grid grid-cols-3 gap-4">
                 {previewUrls.map((url, index) => (
                   <div key={url} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
-                    <img
+                    <Image
                       src={url}
                       alt={`Preview ${index + 1}`}
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                      fill
+                      sizes="(max-width: 768px) 33vw, 120px"
+                      className="object-cover cursor-pointer hover:opacity-90 transition-opacity"
                       onClick={() => setZoomedImage(url)}
+                      unoptimized
                     />
                     <button
                       type="button"
@@ -628,7 +632,7 @@ export default function NewProductPage() {
 
                 {acceptedExchangeTypes?.includes("giveaway") && (
                     <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-md text-sm">
-                        ✨ Tu publicación aparecerá en la sección de "Regalos" y será gratuita para quien la solicite.
+                        ✨ Tu publicación aparecerá en la sección de &quot;Regalos&quot; y será gratuita para quien la solicite.
                     </div>
                 )}
 
@@ -833,11 +837,14 @@ export default function NewProductPage() {
           onClick={() => setZoomedImage(null)}
         >
           <div className="relative max-w-full max-h-full">
-            <img
+            <Image
               src={zoomedImage}
               alt="Zoomed preview"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              width={1600}
+              height={1600}
+              className="max-w-full max-h-[90vh] w-auto h-auto object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}
+              unoptimized
             />
             <button
               type="button"
