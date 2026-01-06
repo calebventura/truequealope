@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Product } from "@/types/product";
+import { Product, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +26,7 @@ const productSchema = z
     location: z.string().min(3, "Ingresa una ubicacion valida"),
     communityId: z.string().nullable().optional(),
     otherCategoryLabel: z.string().optional(),
+    exchangeMode: z.enum(["sale", "giveaway", "trade", "permuta"]),
   })
   .superRefine((val, ctx) => {
     if (val.categoryId === "other") {
@@ -37,6 +38,14 @@ const productSchema = z
           message: "Describe la categoria para 'Otros'.",
         });
       }
+    }
+
+    if ((val.exchangeMode === "sale" || val.exchangeMode === "permuta") && (!val.price || Number.isNaN(val.price))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["price"],
+        message: "Ingresa el precio para este método.",
+      });
     }
   });
 
@@ -87,6 +96,15 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     resolver: zodResolver(productSchema),
   });
   const categoryId = watch("categoryId");
+  const exchangeModeWatch = watch("exchangeMode");
+
+  const deriveExchangeMode = (product: Product): "sale" | "giveaway" | "trade" | "permuta" => {
+    const accepted = product.acceptedExchangeTypes || [];
+    if (accepted.includes("giveaway")) return "giveaway";
+    if (accepted.includes("exchange_plus_cash")) return "permuta";
+    if (accepted.some((t) => t === "product" || t === "service")) return "trade";
+    return "sale";
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -115,6 +133,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
            return;
         }
 
+        const exchangeMode = deriveExchangeMode(data);
+
         reset({
           title: data.title,
           description: data.description,
@@ -125,6 +145,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           condition: data.condition,
           location: data.location,
           communityId: data.communityId ?? "",
+          exchangeMode,
         } as ProductForm);
 
         // Parse location
@@ -155,6 +176,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         fetchProduct();
     }
   }, [productId, user, authLoading, reset, router]);
+
+  // Limpiar precio si el modo no requiere monto
+  useEffect(() => {
+    if (exchangeModeWatch === "giveaway" || exchangeModeWatch === "trade") {
+      setValue("price", undefined, { shouldValidate: true });
+    }
+  }, [exchangeModeWatch, setValue]);
 
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dept = e.target.value as Department | "";
@@ -190,6 +218,20 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 ...data,
                 visibility: "public",
                 communityId: selectedCommunity,
+                exchangeMode: undefined, // evitar guardar el helper directo
+                acceptedExchangeTypes: (() => {
+                  const mode = data.exchangeMode;
+                  const list: ExchangeType[] = [];
+                  if (mode === "sale") list.push("money");
+                  else if (mode === "giveaway") list.push("giveaway");
+                  else if (mode === "trade") list.push("product");
+                  else if (mode === "permuta") list.push("exchange_plus_cash", "product");
+                  return list;
+                })(),
+                price:
+                  data.exchangeMode === "sale" || data.exchangeMode === "permuta"
+                    ? data.price ?? null
+                    : null,
                 wanted: data.wanted ? data.wanted.split(',').map(s => s.trim()).filter(Boolean) : [],
                 otherCategoryLabel: data.categoryId === "other" ? trimmedOther : null,
             })
@@ -233,13 +275,51 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Método de intercambio</label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {[
+              { id: "sale", label: "Venta" },
+              { id: "permuta", label: "Permuta" },
+              { id: "trade", label: "Trueque" },
+              { id: "giveaway", label: "Regalo" },
+            ].map((option) => (
+              <label
+                key={option.id}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer ${
+                  exchangeModeWatch === option.id
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                    : "border-gray-300 dark:border-gray-700"
+                }`}
+              >
+                <input
+                  type="radio"
+                  value={option.id}
+                  {...register("exchangeMode")}
+                  checked={exchangeModeWatch === option.id}
+                  onChange={(e) => setValue("exchangeMode", e.target.value as ProductForm["exchangeMode"])}
+                />
+                <span className="text-sm text-gray-800 dark:text-gray-100">{option.label}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Venta y permuta requieren precio. Trueque y regalo no necesitan monto.
+          </p>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Precio (S/.)</label>
           <input
             type="number"
              step="0.01"
             {...register("price", { valueAsNumber: true })}
             className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            disabled={exchangeModeWatch === "giveaway" || exchangeModeWatch === "trade"}
           />
+          {(exchangeModeWatch === "giveaway" || exchangeModeWatch === "trade") && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">No se requiere precio para este método.</p>
+          )}
+          {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price.message}</p>}
         </div>
 
          <div>
