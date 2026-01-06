@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
 import { createOrder } from "@/lib/orders";
@@ -56,6 +56,7 @@ export default function ProductDetailPage() {
     completed: number | null;
   }>({ publications: null, completed: null });
   const [statsLoading, setStatsLoading] = useState(false);
+  const [hasRegisteredView, setHasRegisteredView] = useState(false);
 
   // Initialize intent based on product type
   useEffect(() => {
@@ -407,6 +408,64 @@ export default function ProductDetailPage() {
 
     void fetchSellerStats();
   }, [product]);
+
+  useEffect(() => {
+    const registerView = async () => {
+      if (!product?.id) return;
+      if (hasRegisteredView) return;
+      // No contar al vendedor
+      if (user && product.sellerId === user.uid) return;
+
+      // Generar viewerId persistido para anónimos
+      let viewerId = user?.uid;
+      if (!viewerId) {
+        try {
+          const key = "viewer_id";
+          const existing = localStorage.getItem(key);
+          if (existing) {
+            viewerId = existing;
+          } else {
+            const generated = crypto.randomUUID();
+            localStorage.setItem(key, generated);
+            viewerId = generated;
+          }
+        } catch (error) {
+          console.warn("No se pudo leer/generar viewer_id", error);
+          return;
+        }
+      }
+
+      if (!viewerId) return;
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const productRef = doc(db, "products", product.id!);
+          const viewRef = doc(collection(productRef, "views"), viewerId!);
+
+          const viewSnap = await tx.get(viewRef);
+          const productSnap = await tx.get(productRef);
+
+          if (viewSnap.exists()) {
+            return;
+          }
+
+          const currentCount = (productSnap.data()?.viewCount as number | undefined) ?? 0;
+
+          tx.set(viewRef, {
+            viewerId,
+            createdAt: serverTimestamp(),
+          });
+
+          tx.update(productRef, { viewCount: currentCount + 1 });
+        });
+        setHasRegisteredView(true);
+      } catch (error) {
+        console.error("Error registrando vista:", error);
+      }
+    };
+
+    void registerView();
+  }, [product?.id, product?.sellerId, user, hasRegisteredView]);
 
   // Derivados principales (se calculan siempre para no romper el orden de hooks)
   const listingType = product?.listingType || "product";

@@ -28,8 +28,25 @@ service cloud.firestore {
                     && request.resource.data.sellerId == request.auth.uid
                     && request.resource.data.status == 'active';
 
-      allow update: if isAuthenticated()
-                    && resource.data.sellerId == request.auth.uid;
+      allow update: if (
+                      isAuthenticated()
+                      && resource.data.sellerId == request.auth.uid
+                    )
+                    ||
+                    (
+                      // Permitir incremento de viewCount por cualquier usuario (auth o anon)
+                      request.resource.data.diff(resource.data).changedKeys().hasOnly(["viewCount"])
+                      &&
+                      (
+                        (!(resource.data.viewCount is int) && request.resource.data.viewCount == 1)
+                        ||
+                        (
+                          (resource.data.viewCount is int)
+                          && request.resource.data.viewCount >= resource.data.viewCount
+                          && request.resource.data.viewCount <= resource.data.viewCount + 1
+                        )
+                      )
+                    );
 
       allow delete: if isAuthenticated()
                     && resource.data.sellerId == request.auth.uid;
@@ -80,6 +97,16 @@ service cloud.firestore {
                       || request.auth.uid == resource.data.userId
                     );
       }
+
+      // Visibilizaciones (vista única por viewerId)
+      match /views/{viewerId} {
+        allow get: if true;
+        allow create: if
+          request.resource.data.viewerId == viewerId
+          && request.resource.data.keys().hasOnly(["viewerId", "createdAt"]);
+        allow update, delete: if false;
+        allow list, read: if false;
+      }
     }
 
     // Lectura de collection group contactLogs (independiente del padre) para vistas agregadas
@@ -105,10 +132,16 @@ service cloud.firestore {
     // Colección: orders
     // Solo lectura para comprador o vendedor. Escritura desde backend (Admin SDK).
     match /orders/{orderId} {
-      allow read: if isAuthenticated()
-                  && (
-                    request.auth.uid == resource.data.buyerId
-                    || request.auth.uid == resource.data.sellerId
+      allow read: if (
+                    isAuthenticated()
+                    && (
+                      request.auth.uid == resource.data.buyerId
+                      || request.auth.uid == resource.data.sellerId
+                    )
+                  )
+                  || (
+                    // Permitir lectura de órdenes completadas para métricas públicas (no requiere auth)
+                    resource.data.status == "completed"
                   );
       allow write: if false;
     }

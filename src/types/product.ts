@@ -81,5 +81,9 @@ export interface Product {
    * Etiquetas de tendencia para curacion manual.
    */
   trendTags?: string[];
+  /**
+   * Contador de visibilizaciones (vistas únicas por usuario/dispositivo).
+   */
+  viewCount?: number | null;
 }
 
