@@ -22,6 +22,7 @@ import { Order } from "@/types/order";
 import { Button } from "@/components/ui/Button";
 import { getContactClicksCount, logContactClick } from "@/lib/contact";
 import { CATEGORIES } from "@/lib/constants";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 type ActivityTab = "seller" | "buyer";
 type ProductStatus = "active" | "reserved" | "sold" | "deleted";
@@ -69,6 +70,34 @@ function SellerActivity({ userId }: { userId: string }) {
   } | null>(null);
   const [dealModalError, setDealModalError] = useState<string | null>(null);
   const [dealModalSaving, setDealModalSaving] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    title: string;
+    description: string;
+    tone?: "info" | "error" | "success";
+  } | null>(null);
+  const [confirmOrderModal, setConfirmOrderModal] = useState<{
+    orderId: string;
+    productTitle: string;
+    price: number;
+  } | null>(null);
+  const [orderActionLoading, setOrderActionLoading] = useState(false);
+
+  const showAlert = (
+    description: string,
+    options?: { title?: string; tone?: "info" | "error" | "success" }
+  ) => {
+    setAlertModal({
+      title:
+        options?.title ??
+        (options?.tone === "success"
+          ? "Listo"
+          : options?.tone === "error"
+          ? "Hubo un problema"
+          : "Aviso"),
+      description,
+      tone: options?.tone ?? "info",
+    });
+  };
 
   useEffect(() => {
     const fetchPendingOrders = async () => {
@@ -95,31 +124,30 @@ function SellerActivity({ userId }: { userId: string }) {
     fetchPendingOrders();
   }, [userId]);
 
-  const handleOrderAction = async (orderId: string, action: 'confirm' | 'reject') => {
-      if (!confirm(`¿Estás seguro de que quieres ${action === 'confirm' ? 'confirmar' : 'rechazar'} esta venta?`)) return;
-      
-      try {
-          const user = auth.currentUser;
-          if (!user) return;
-          const token = await user.getIdToken();
-          
-          const res = await fetch(`/api/orders/${orderId}/${action}`, {
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${token}`
-              }
-          });
-          
-          if (!res.ok) throw new Error("Failed to process order");
-          
-          // Update local state
-          setPendingOrders(prev => prev.filter(o => o.id !== orderId));
-          // Refresh products to reflect status change
-          window.location.reload(); // Simple refresh to sync all states
-      } catch (e) {
-          console.error(e);
-          alert("Error al procesar la solicitud");
-      }
+  const processOrderAction = async (orderId: string, action: 'confirm' | 'reject') => {
+    try {
+      setOrderActionLoading(true);
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+
+      const res = await fetch(`/api/orders/${orderId}/${action}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) throw new Error("Failed to process order");
+
+      setPendingOrders(prev => prev.filter(o => o.id !== orderId));
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      showAlert("Error al procesar la solicitud", { tone: "error", title: "No se pudo procesar" });
+    } finally {
+      setOrderActionLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -204,7 +232,10 @@ function SellerActivity({ userId }: { userId: string }) {
   ) => {
     const product = products.find((p) => p.id === productId);
     if (!product) {
-      alert("No pudimos encontrar esta publicacion en tu lista actual.");
+      showAlert("No pudimos encontrar esta publicacion en tu lista actual.", {
+        tone: "error",
+        title: "Publicación no encontrada",
+      });
       return;
     }
 
@@ -246,7 +277,10 @@ function SellerActivity({ userId }: { userId: string }) {
 
       if (newStatus === "sold") {
         if (!options?.finalizeData?.userId || !options.finalizeData.email) {
-          alert("Debes asignar un correo válido de usuario antes de cerrar la operación.");
+          showAlert(
+            "Debes asignar un correo válido de usuario antes de cerrar la operación.",
+            { tone: "error", title: "Falta correo del comprador" }
+          );
           return;
         }
 
@@ -319,7 +353,7 @@ function SellerActivity({ userId }: { userId: string }) {
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Error al actualizar el estado");
+      showAlert("Error al actualizar el estado", { tone: "error", title: "No se guardó el cambio" });
     }
   };
   const displayedProducts = products.filter(
@@ -370,7 +404,10 @@ function SellerActivity({ userId }: { userId: string }) {
   const assignUserByEmail = async (productId: string, emailInput: string) => {
     const email = emailInput.trim().toLowerCase();
     if (!email || !email.includes("@")) {
-      alert("Ingresa un correo válido para asignar.");
+      showAlert("Ingresa un correo válido para asignar.", {
+        tone: "error",
+        title: "Correo inválido",
+      });
       return;
     }
     try {
@@ -380,7 +417,10 @@ function SellerActivity({ userId }: { userId: string }) {
       );
       const snap = await getDocs(q);
       if (snap.empty) {
-        alert("No encontramos un usuario con ese correo.");
+        showAlert("No encontramos un usuario con ese correo.", {
+          tone: "info",
+          title: "Usuario no encontrado",
+        });
         return;
       }
       const userDoc = snap.docs[0];
@@ -396,7 +436,10 @@ function SellerActivity({ userId }: { userId: string }) {
       setReservedForInputs((prev) => ({ ...prev, [productId]: data.email || email }));
     } catch (e) {
       console.error("Error buscando usuario:", e);
-      alert("Ocurrió un error al buscar el usuario.");
+      showAlert("Ocurrió un error al buscar el usuario.", {
+        tone: "error",
+        title: "No se pudo buscar",
+      });
     }
   };
 
@@ -487,6 +530,7 @@ function SellerActivity({ userId }: { userId: string }) {
   };
 
   return (
+    <>
     <div>
       {pendingOrders.length > 0 && (
         <div className="mb-8 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-6 shadow-sm transition-colors">
@@ -504,10 +548,23 @@ function SellerActivity({ userId }: { userId: string }) {
                     <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">S/. {order.price.toLocaleString()}</p>
                  </div>
                  <div className="flex gap-2 w-full md:w-auto">
-                    <Button onClick={() => handleOrderAction(order.id, 'confirm')} className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500 flex-1 md:flex-none">
+                    <Button
+                      onClick={() =>
+                        setConfirmOrderModal({
+                          orderId: order.id,
+                          productTitle: order.productTitle,
+                          price: order.price,
+                        })
+                      }
+                      className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500 flex-1 md:flex-none"
+                    >
                         Confirmar Venta
                     </Button>
-                    <Button onClick={() => handleOrderAction(order.id, 'reject')} variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-900/20 flex-1 md:flex-none">
+                    <Button
+                      onClick={() => processOrderAction(order.id, 'reject')}
+                      variant="outline"
+                      className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-900/20 flex-1 md:flex-none"
+                    >
                         Rechazar
                     </Button>
                  </div>
@@ -909,6 +966,53 @@ function SellerActivity({ userId }: { userId: string }) {
         </div>
       )}
     </div>
+
+    <AlertModal
+      open={!!alertModal}
+      title={alertModal?.title ?? ""}
+      description={alertModal?.description ?? ""}
+      tone={alertModal?.tone}
+      onClose={() => setAlertModal(null)}
+    />
+    {confirmOrderModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-100">
+              Confirmar venta
+            </span>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {confirmOrderModal.productTitle}
+            </h3>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-200">
+            Se registrará la venta por <strong>S/. {confirmOrderModal.price.toLocaleString()}</strong>. ¿Deseas continuar?
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOrderModal(null)}
+              disabled={orderActionLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirmOrderModal) {
+                  void processOrderAction(confirmOrderModal.orderId, 'confirm');
+                }
+                setConfirmOrderModal(null);
+              }}
+              disabled={orderActionLoading}
+              className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500"
+            >
+              {orderActionLoading ? "Procesando..." : "Confirmar"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -920,6 +1024,28 @@ function BuyerActivity({ userId }: { userId: string }) {
   const [sellerContacts, setSellerContacts] = useState<
     Record<string, { phoneNumber?: string | null; name?: string | null }>
   >({});
+  const [alertModal, setAlertModal] = useState<{
+    title: string;
+    description: string;
+    tone?: "info" | "error" | "success";
+  } | null>(null);
+
+  const showAlert = (
+    description: string,
+    options?: { title?: string; tone?: "info" | "error" | "success" }
+  ) => {
+    setAlertModal({
+      title:
+        options?.title ??
+        (options?.tone === "success"
+          ? "Listo"
+          : options?.tone === "error"
+          ? "Hubo un problema"
+          : "Aviso"),
+      description,
+      tone: options?.tone ?? "info",
+    });
+  };
 
   useEffect(() => {
     const fetchContacted = async () => {
@@ -1047,7 +1173,10 @@ function BuyerActivity({ userId }: { userId: string }) {
     const phone = sellerContact?.phoneNumber;
 
     if (!phone) {
-      alert("El vendedor no ha configurado su numero de WhatsApp.");
+      showAlert("El vendedor no ha configurado su numero de WhatsApp.", {
+        tone: "info",
+        title: "WhatsApp no disponible",
+      });
       return;
     }
 
@@ -1201,6 +1330,14 @@ function BuyerActivity({ userId }: { userId: string }) {
           </ul>
         )}
       </section>
+
+      <AlertModal
+        open={!!alertModal}
+        title={alertModal?.title ?? ""}
+        description={alertModal?.description ?? ""}
+        tone={alertModal?.tone}
+        onClose={() => setAlertModal(null)}
+      />
     </div>
   );
 }

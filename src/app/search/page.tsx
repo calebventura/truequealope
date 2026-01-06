@@ -254,7 +254,7 @@ function SearchContent() {
       try {
         const q = query(
           collection(db, "products"),
-          where("status", "in", ["active", "reserved", "sold"])
+          where("status", "in", ["active", "reserved"])
         );
         const querySnapshot = await getDocs(q);
 

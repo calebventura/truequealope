@@ -13,6 +13,7 @@ import { CATEGORIES, CONDITIONS } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
 import { COMMUNITIES } from "@/lib/communities";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const productSchema = z
   .object({
@@ -48,6 +49,28 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [alertModal, setAlertModal] = useState<{
+    title: string;
+    description: string;
+    tone?: "info" | "error" | "success";
+  } | null>(null);
+
+  const showAlert = (
+    description: string,
+    options?: { title?: string; tone?: "info" | "error" | "success" }
+  ) => {
+    setAlertModal({
+      title:
+        options?.title ??
+        (options?.tone === "success"
+          ? "Listo"
+          : options?.tone === "error"
+          ? "Hubo un problema"
+          : "Aviso"),
+      description,
+      tone: options?.tone ?? "info",
+    });
+  };
 
   // Location State
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
@@ -84,7 +107,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         }
 
         if (data.status === "sold" || data.status === "deleted") {
-           alert("No puedes editar un producto vendido o eliminado.");
+           showAlert("No puedes editar un producto vendido o eliminado.", {
+             tone: "info",
+             title: "Edición no disponible",
+           });
            router.replace("/activity");
            return;
         }
@@ -324,6 +350,14 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             <Button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar Cambios"}</Button>
         </div>
       </form>
+
+      <AlertModal
+        open={!!alertModal}
+        title={alertModal?.title ?? ""}
+        description={alertModal?.description ?? ""}
+        tone={alertModal?.tone}
+        onClose={() => setAlertModal(null)}
+      />
     </div>
   );
 }

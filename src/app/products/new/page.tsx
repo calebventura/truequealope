@@ -20,6 +20,7 @@ import { Product, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS, DRAFT_KEY } from "@/lib/constants";
 import { LOCATIONS, Department } from "@/lib/locations";
 import { COMMUNITIES } from "@/lib/communities";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const productSchema = z
   .object({
@@ -116,6 +117,28 @@ export default function NewProductPage() {
   const [uploading, setUploading] = useState(false);
   const [generalError, setGeneralError] = useState("");
   const [draftRestored, setDraftRestored] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    title: string;
+    description: string;
+    tone?: "info" | "error" | "success";
+  } | null>(null);
+
+  const showAlert = (
+    description: string,
+    options?: { title?: string; tone?: "info" | "error" | "success" }
+  ) => {
+    setAlertModal({
+      title:
+        options?.title ??
+        (options?.tone === "success"
+          ? "Listo"
+          : options?.tone === "error"
+          ? "Hubo un problema"
+          : "Aviso"),
+      description,
+      tone: options?.tone ?? "info",
+    });
+  };
 
   // Image Preview State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -306,7 +329,10 @@ export default function NewProductPage() {
 
     if (!phoneNumber) {
       saveDraft(data);
-      alert("Antes de publicar debes agregar tu número de WhatsApp en tu perfil.");
+      showAlert("Antes de publicar debes agregar tu número de WhatsApp en tu perfil.", {
+        tone: "info",
+        title: "Configura tu WhatsApp",
+      });
       router.push("/profile?next=/products/new");
       return;
     }
@@ -859,6 +885,14 @@ export default function NewProductPage() {
           </div>
         </div>
       )}
+
+      <AlertModal
+        open={!!alertModal}
+        title={alertModal?.title ?? ""}
+        description={alertModal?.description ?? ""}
+        tone={alertModal?.tone}
+        onClose={() => setAlertModal(null)}
+      />
     </div>
   );
 }

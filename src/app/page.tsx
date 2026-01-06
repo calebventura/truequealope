@@ -56,7 +56,7 @@ export default function HomePage() {
       try {
         const q = query(
           collection(db, "products"),
-          where("status", "in", ["active", "reserved", "sold"])
+          where("status", "in", ["active", "reserved"])
         );
 
         const querySnapshot = await getDocs(q);
@@ -75,23 +75,9 @@ export default function HomePage() {
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const validProducts = productsData.filter(p => {
-            if (p.status === 'sold') {
-                if (!p.soldAt) return false; // Hide if soldAt missing
-                return p.soldAt > oneDayAgo;
-            }
-            return true;
-        });
+        const validProducts = productsData.filter(p => p.status !== 'sold');
 
-        validProducts.sort((a, b) => {
-            // Priority: Active/Reserved (0) < Sold (1)
-            const scoreA = a.status === 'sold' ? 1 : 0;
-            const scoreB = b.status === 'sold' ? 1 : 0;
-            
-            if (scoreA !== scoreB) return scoreA - scoreB;
-            
-            return b.createdAt.getTime() - a.createdAt.getTime();
-        });
+        validProducts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(validProducts);
       } catch (error) {

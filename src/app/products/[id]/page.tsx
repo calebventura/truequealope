@@ -15,6 +15,7 @@ import { UserProfile } from "@/types/user";
 import { getCommunityById } from "@/lib/communities";
 import { createPermutaOffer } from "@/lib/offers";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const resolveProfileDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -57,6 +58,29 @@ export default function ProductDetailPage() {
   }>({ publications: null, completed: null });
   const [statsLoading, setStatsLoading] = useState(false);
   const [hasRegisteredView, setHasRegisteredView] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    title: string;
+    description: string;
+    tone?: "info" | "error" | "success";
+  } | null>(null);
+  const [confirmBuyOpen, setConfirmBuyOpen] = useState(false);
+
+  const showAlert = (
+    description: string,
+    options?: { title?: string; tone?: "info" | "error" | "success" }
+  ) => {
+    setAlertModal({
+      title:
+        options?.title ??
+        (options?.tone === "success"
+          ? "Listo"
+          : options?.tone === "error"
+          ? "Hubo un problema"
+          : "Aviso"),
+      description,
+      tone: options?.tone ?? "info",
+    });
+  };
 
   // Initialize intent based on product type
   useEffect(() => {
@@ -116,7 +140,10 @@ export default function ProductDetailPage() {
 
     const phone = sellerProfile?.phoneNumber ?? fetchedPhone;
     if (!phone) {
-      alert("El vendedor no ha configurado su número de WhatsApp.");
+      showAlert("El vendedor no ha configurado su número de WhatsApp.", {
+        tone: "info",
+        title: "WhatsApp no disponible",
+      });
       return;
     }
 
@@ -246,20 +273,33 @@ export default function ProductDetailPage() {
     if (!product) return;
 
     if (product.price == null) {
-      alert("Este producto no tiene precio de venta.");
+      showAlert("Este producto no tiene precio de venta.", {
+        tone: "info",
+        title: "Precio no disponible",
+      });
       return;
     }
 
     setBuying(true);
     try {
       const orderId = await createOrder(product.id!);
-      alert(`Orden creada con éxito. ID: ${orderId.orderId}`);
+      showAlert(`Orden creada con éxito. ID: ${orderId.orderId}`, {
+        tone: "success",
+        title: "Orden creada",
+      });
     } catch (error) {
       console.error("Error al comprar:", error);
-      alert(`Error al crear la orden: ${(error as Error).message}`);
+      showAlert(`Error al crear la orden: ${(error as Error).message}`, {
+        tone: "error",
+        title: "No se pudo crear la orden",
+      });
     } finally {
       setBuying(false);
     }
+  };
+  const confirmBuy = async () => {
+    setConfirmBuyOpen(false);
+    await handleBuy();
   };
 
   const handleShare = async () => {
@@ -278,7 +318,10 @@ export default function ProductDetailPage() {
 
       if ("clipboard" in navigator && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        alert("Link copiado.");
+        showAlert("Link copiado.", {
+          tone: "success",
+          title: "Listo",
+        });
         return;
       }
 
@@ -1025,7 +1068,7 @@ export default function ProductDetailPage() {
                                 {/* Botón Comprar (Solo si es Venta y hay precio) */}
                                 {(acceptsMoney || isGiveaway) && contactIntent === 'buy' && !isPermuta && (
                                     <button
-                                    onClick={handleBuy}
+                                    onClick={() => setConfirmBuyOpen(true)}
                                     disabled={buyDisabled}
                                     className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
                                         buyDisabled
@@ -1236,6 +1279,26 @@ export default function ProductDetailPage() {
             </div>
           </div>
         )}
+        <AlertModal
+          open={!!alertModal}
+          title={alertModal?.title ?? ""}
+          description={alertModal?.description ?? ""}
+          tone={alertModal?.tone}
+          onClose={() => setAlertModal(null)}
+        />
+        <AlertModal
+          open={confirmBuyOpen}
+          title="Confirmar compra"
+          description={
+            product?.price != null
+              ? `Vas a comprar "${product.title}" por S/. ${product.price.toLocaleString()}. ¿Deseas continuar?`
+              : `Vas a reclamar "${product?.title ?? "este producto"}" sin costo. ¿Deseas continuar?`
+          }
+          tone="info"
+          primaryLabel={buying ? "Procesando..." : "Confirmar"}
+          onConfirm={confirmBuy}
+          onClose={() => setConfirmBuyOpen(false)}
+        />
       </div>
     </div>
   );
