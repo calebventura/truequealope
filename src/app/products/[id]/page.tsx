@@ -362,6 +362,16 @@ export default function ProductDetailPage() {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+          if ((data.status ?? "active") === "deleted") {
+            setProduct(null);
+            setLoading(false);
+            showAlert("Esta publicación fue eliminada.", {
+              tone: "info",
+              title: "No disponible",
+            });
+            router.replace("/search");
+            return;
+          }
           const productData = {
             id: docSnap.id,
             ...data,

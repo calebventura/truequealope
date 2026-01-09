@@ -72,6 +72,7 @@ function SellerActivity({ userId }: { userId: string }) {
     productId: string;
     title: string;
   } | null>(null);
+  const [showSold, setShowSold] = useState(false);
   const [dealModalError, setDealModalError] = useState<string | null>(null);
   const [dealModalSaving, setDealModalSaving] = useState(false);
   const [alertModal, setAlertModal] = useState<{
@@ -361,9 +362,14 @@ function SellerActivity({ userId }: { userId: string }) {
       showAlert("Error al actualizar el estado", { tone: "error", title: "No se guardó el cambio" });
     }
   };
-  const displayedProducts = products.filter(
-    (p) => p.status === "active" || p.status === "reserved" || p.status === "sold"
+  const activeReservedProducts = products.filter(
+    (p) => p.status === "active" || p.status === "reserved"
   );
+  const soldProducts = products.filter((p) => p.status === "sold");
+  const visibleProducts = [
+    ...activeReservedProducts,
+    ...(showSold ? soldProducts : []),
+  ];
 
   const getAcceptedTypes = (product: Product) => {
     const accepted = product.acceptedExchangeTypes
@@ -624,9 +630,24 @@ function SellerActivity({ userId }: { userId: string }) {
         </div>
       </div>
 
+      {soldProducts.length > 0 && (
+        <div className="flex justify-end mb-4">
+          <button
+            type="button"
+            onClick={() => setShowSold((prev) => !prev)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            {showSold ? "Ocultar concretadas" : "Ver concretadas"}
+            <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+              {soldProducts.length}
+            </span>
+          </button>
+        </div>
+      )}
+
       {loadingProducts ? (
         <div className="text-center py-10 text-gray-600 dark:text-gray-400">Cargando tus productos...</div>
-      ) : displayedProducts.length === 0 ? (
+      ) : visibleProducts.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow transition-colors">
           <svg
             className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"
@@ -652,7 +673,7 @@ function SellerActivity({ userId }: { userId: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {displayedProducts.map((product) => (
+          {visibleProducts.map((product) => (
             <div
               key={product.id}
               className="flex flex-col md:flex-row md:items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 gap-4 bg-white dark:bg-gray-800 shadow-sm transition-colors"
@@ -1148,14 +1169,17 @@ function BuyerActivity({ userId }: { userId: string }) {
           }
         }
 
-        const entries: ContactedProduct[] = await Promise.all(
-          Array.from(grouped.entries()).map(async ([productId, info]) => {
+        const entries = await Promise.all(
+          Array.from(grouped.entries()).map(async ([productId, info]): Promise<ContactedProduct | null> => {
             try {
               const productSnap = await getDoc(doc(db, "products", productId));
               if (!productSnap.exists()) {
                 return { productId, ...info, product: null };
               }
               const data = productSnap.data();
+              if ((data.status ?? "active") === "deleted") {
+                return null;
+              }
               const product = {
                 id: productSnap.id,
                 ...data,
@@ -1171,8 +1195,12 @@ function BuyerActivity({ userId }: { userId: string }) {
           })
         );
 
-        entries.sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime());
-        setContacted(entries);
+        const filteredEntries = entries.filter(
+          (entry): entry is ContactedProduct => entry !== null
+        );
+
+        filteredEntries.sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime());
+        setContacted(filteredEntries);
       } catch (error) {
         console.error("Error fetching contacted products:", error);
         setContacted([]);
@@ -1199,7 +1227,9 @@ function BuyerActivity({ userId }: { userId: string }) {
           };
         }) as Order[];
 
-        const filteredOrders = ordersData.filter((order) => order.status !== "deleted");
+        const filteredOrders = ordersData.filter(
+          (order) => (order as { status?: string }).status !== "deleted"
+        );
 
         filteredOrders.sort((a, b) => {
           const dateA = toDate(a.createdAt) ?? new Date();
