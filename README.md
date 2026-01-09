@@ -34,3 +34,11 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Recent Changes
+
+- Home/Search listings now reuse a shared `ProductCard` component (no duplicated card markup).
+- Home page wraps content in a Suspense fallback to support `useSearchParams` during prerender/build.
+- Activity (seller): active/reserved items display by default; a toggle reveals concretadas (sold) separately.
+- Activity (buyer): “Contactados” omits deleted posts; “Mis compras” still lists them.
+- Deleted products no longer render in detail view (redirects with notice) or buyer activity feed.

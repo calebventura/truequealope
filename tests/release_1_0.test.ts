@@ -2,11 +2,9 @@ import { CATEGORIES } from '@/lib/constants';
 import { Product } from '@/types/product';
 
 describe('Release 1.0 - Business Model Changes', () => {
-  test('Category "Regalo de mi ex" should exist', () => {
+  test('Category "Regalo de mi ex" should NOT exist anymore', () => {
     const exGiftCategory = CATEGORIES.find(c => c.id === 'ex-gift');
-    expect(exGiftCategory).toBeDefined();
-    expect(exGiftCategory?.name).toBe('Regalo de mi ex');
-    expect(exGiftCategory?.icon).toBe('💔');
+    expect(exGiftCategory).toBeUndefined();
   });
 
   test('Product interface should support new fields', () => {
