@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
@@ -27,10 +27,14 @@ import {
   COMMUNITIES,
   getCommunityById,
 } from "@/lib/communities";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 
 const NEW_BADGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +45,7 @@ export default function HomePage() {
   const [trendFilters, setTrendFilters] = useState<string[]>([]);
   const trendOptions = getActiveTrends();
   const nowTimestamp = Date.now();
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const activeTrends = useMemo(() => {
     if (trendFilters.length === 0) return [];
     return trendFilters
@@ -49,6 +54,67 @@ export default function HomePage() {
         (trend): trend is TrendConfig => Boolean(trend && isTrendActive(trend))
       );
   }, [trendFilters]);
+
+  useEffect(() => {
+    const parseMulti = (key: string) =>
+      searchParams
+        .getAll(key)
+        .flatMap((value) => value.split(",").map((v) => v.trim()))
+        .filter(Boolean);
+
+    setTrendFilters(parseMulti("trend"));
+    setCategoryFilters(parseMulti("category"));
+    setCommunityFilters(parseMulti("community"));
+    setExchangeFilters(
+      parseMulti("exchange").filter((v): v is ExchangeFilter =>
+        ["sale", "trade", "permuta", "giveaway"].includes(v)
+      )
+    );
+    setListingFilters(
+      parseMulti("listing").filter((v): v is ListingFilter =>
+        ["product", "service"].includes(v)
+      )
+    );
+    setFiltersHydrated(true);
+  }, [searchParams]);
+
+  const syncQueryFromState = useCallback(() => {
+    const params = new URLSearchParams();
+    categoryFilters.forEach((id) => params.append("category", id));
+    trendFilters.forEach((id) => params.append("trend", id));
+    communityFilters.forEach((id) => params.append("community", id));
+    exchangeFilters.forEach((id) => params.append("exchange", id));
+    listingFilters.forEach((id) => params.append("listing", id));
+
+    const nextQuery = params.toString();
+    const currentQuery = searchParams.toString();
+    if (nextQuery === currentQuery) return;
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    });
+  }, [
+    categoryFilters,
+    communityFilters,
+    exchangeFilters,
+    listingFilters,
+    pathname,
+    router,
+    searchParams,
+    trendFilters,
+  ]);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
+    syncQueryFromState();
+  }, [
+    syncQueryFromState,
+    categoryFilters,
+    trendFilters,
+    communityFilters,
+    exchangeFilters,
+    listingFilters,
+  ]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -92,6 +158,9 @@ export default function HomePage() {
 
   const matchesTrend = (product: Product, trend: TrendConfig) => {
     const { filters, productIds } = trend;
+
+    // If the product was tagged explicitly with this trend, count it as match.
+    if (product.trendTags?.includes(trend.id)) return true;
 
     if (productIds && productIds.length > 0) {
       if (!product.id || !productIds.includes(product.id)) return false;
@@ -365,7 +434,7 @@ export default function HomePage() {
         />
 
         {filteredProducts.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-sm dark:border dark:border-gray-800 transition-colors">
+          <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-sm dark:border dark:border-gray-800 transition-colors mt-6">
             <p className="text-gray-500 dark:text-gray-400 text-lg">
               No hay productos para este filtro.
             </p>
@@ -380,7 +449,7 @@ export default function HomePage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-6">
             {filteredProducts.map((product) => {
               const acceptedTypes = getAcceptedExchangeTypes(product);
               const isGiveaway = acceptedTypes.includes("giveaway");
@@ -407,7 +476,8 @@ export default function HomePage() {
               let modeBadge = null;
               if (isGiveaway) modeBadge = "Regalo";
               else if (isPermuta) modeBadge = "Permuta";
-              else if (acceptsTrade && acceptsMoney) modeBadge = "Venta / Trueque";
+              else if (acceptsMoney && acceptsTrade) modeBadge = "Venta / Trueque";
+              else if (acceptsMoney) modeBadge = "Venta";
               else if (acceptsTrade) modeBadge = "Trueque";
 
               return (

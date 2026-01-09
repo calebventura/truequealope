@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,8 +18,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { uploadImage } from "@/lib/storage";
 import { Product, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS, DRAFT_KEY } from "@/lib/constants";
-import { LOCATIONS, Department } from "@/lib/locations";
+import {
+  LOCATIONS,
+  Department,
+  PROVINCES_BY_DEPARTMENT,
+  formatDepartmentLabel,
+  formatLocationPart,
+  buildLocationLabel,
+  parseLocationParts,
+} from "@/lib/locations";
 import { COMMUNITIES } from "@/lib/communities";
+import { getActiveTrends } from "@/lib/trends";
 import { AlertModal } from "@/components/ui/AlertModal";
 
 const productSchema = z
@@ -41,7 +50,8 @@ const productSchema = z
 
     categoryId: z.string().min(1, "Selecciona una categoría"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
-    location: z.string().min(3, "Ingresa una ubicación válida"),
+    location: z.string().min(3, "Selecciona departamento, provincia y distrito"),
+    trendTags: z.array(z.string()).optional(),
     images: z.any().optional(),
   })
   .superRefine((data, ctx) => {
@@ -147,6 +157,7 @@ export default function NewProductPage() {
 
   // Location State
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
+  const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
 
   const {
@@ -165,6 +176,7 @@ export default function NewProductPage() {
       condition: "used",
       communityId: null,
       otherCategoryLabel: "",
+      trendTags: [],
     },
   });
 
@@ -172,6 +184,34 @@ export default function NewProductPage() {
   const acceptedExchangeTypes = watch("acceptedExchangeTypes");
   const communityId = watch("communityId");
   const categoryId = watch("categoryId");
+  const trendTags = watch("trendTags") || [];
+  const trendOptions = useMemo(() => getActiveTrends(), []);
+
+  const focusFirstError = (fieldOrder: (keyof ProductForm)[]) => {
+    const target = fieldOrder.find((field) => errors[field]);
+    if (!target) return;
+    const el = document.querySelector<HTMLElement>(`[data-field='${target}']`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus?.({ preventScroll: true });
+    }
+  };
+
+  const updateLocationValue = (
+    department: Department | "",
+    province: string,
+    district: string
+  ) => {
+    if (department && province && district) {
+      setValue(
+        "location",
+        buildLocationLabel(district, province, department),
+        { shouldValidate: true }
+      );
+    } else {
+      setValue("location", "", { shouldValidate: true });
+    }
+  };
 
   // Cleanup object URLs
   useEffect(() => {
@@ -213,23 +253,25 @@ export default function NewProductPage() {
     if (draftRaw) {
       try {
         const draft = JSON.parse(draftRaw) as Partial<ProductForm>;
-        
-        // Restore location state
-        if (draft.location) {
-          const parts = draft.location.split(",").map((s) => s.trim());
-          if (parts.length === 2) {
-            const [dist, dept] = parts;
-            if (Object.keys(LOCATIONS).includes(dept)) {
-              setSelectedDepartment(dept as Department);
-              if ((LOCATIONS[dept as Department] as readonly string[]).includes(dist)) {
-                setSelectedDistrict(dist);
-              }
-            }
-          }
-        }
+
+        // Restore location state (supports old "Distrito, Departamento" and new "Distrito, Provincia, Departamento")
+        const parsedLocation = parseLocationParts(draft.location ?? null);
+        setSelectedDepartment(parsedLocation.department);
+        setSelectedProvince(parsedLocation.province);
+        setSelectedDistrict(parsedLocation.district);
 
         reset({
           ...draft,
+          location:
+            parsedLocation.department &&
+            parsedLocation.province &&
+            parsedLocation.district
+              ? buildLocationLabel(
+                  parsedLocation.district,
+                  parsedLocation.province,
+                  parsedLocation.department
+                )
+              : draft.location ?? "",
           images: undefined,
         });
 
@@ -248,12 +290,14 @@ export default function NewProductPage() {
 
   const nextStep = async () => {
     if (step === 1) {
-      const ok = await trigger(["images", "title", "listingType"]);
+      const ok = await trigger(["images", "title", "listingType"], {
+        shouldFocus: true,
+      });
       if (ok) setStep(2);
       return;
     }
     if (step === 2) {
-      const ok = await trigger([
+      const step2Fields: (keyof ProductForm)[] = [
         "acceptedExchangeTypes",
         "price",
         "wantedProducts",
@@ -261,8 +305,10 @@ export default function NewProductPage() {
         "otherCategoryLabel",
         "categoryId",
         "condition",
-      ]);
+      ];
+      const ok = await trigger(step2Fields, { shouldFocus: true });
       if (ok) setStep(3);
+      else focusFirstError(step2Fields);
     }
   };
 
@@ -300,16 +346,29 @@ export default function NewProductPage() {
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dept = e.target.value as Department | "";
     setSelectedDepartment(dept);
+    const defaultProvince = dept ? PROVINCES_BY_DEPARTMENT[dept]?.[0] ?? "" : "";
+    setSelectedProvince(defaultProvince);
     setSelectedDistrict("");
-    setValue("location", "", { shouldValidate: true });
+    updateLocationValue(dept, defaultProvince, "");
+  };
+
+  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const province = e.target.value;
+    setSelectedProvince(province);
+    updateLocationValue(selectedDepartment, province, selectedDistrict);
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dist = e.target.value;
     setSelectedDistrict(dist);
-    if (selectedDepartment && dist) {
-      setValue("location", `${dist}, ${selectedDepartment}`, { shouldValidate: true });
-    }
+    updateLocationValue(selectedDepartment, selectedProvince, dist);
+  };
+
+  const handleTrendToggle = (id: string, checked: boolean) => {
+    const current = new Set(trendTags);
+    if (checked) current.add(id);
+    else current.delete(id);
+    setValue("trendTags", Array.from(current), { shouldValidate: false });
   };
 
   const onSubmit = async (data: ProductForm) => {
@@ -392,6 +451,7 @@ export default function NewProductPage() {
         acceptedExchangeTypes: data.acceptedExchangeTypes,
         visibility: "public",
         communityId: selectedCommunity,
+        trendTags: data.trendTags ?? [],
       };
 
       const newProduct: Omit<Product, "id"> = {
@@ -568,6 +628,7 @@ export default function NewProductPage() {
                       value={type.id}
                       checked={acceptedExchangeTypes?.includes(type.id as ExchangeType)}
                       onChange={(e) => handleExchangeTypeChange(type.id as ExchangeType, e.target.checked)}
+                      data-field="acceptedExchangeTypes"
                       className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <div>
@@ -601,6 +662,7 @@ export default function NewProductPage() {
                     step="0.01"
                     {...register("price", { valueAsNumber: true })}
                     placeholder="0.00"
+                    data-field="price"
                     className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                     />
                     {acceptedExchangeTypes?.includes("exchange_plus_cash") && (
@@ -625,6 +687,7 @@ export default function NewProductPage() {
                     <textarea
                     rows={3}
                     {...register("wantedProducts")}
+                    data-field="wantedProducts"
                     className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                     placeholder="Ej: Celular, Laptop, Bicicleta..."
                     />
@@ -645,6 +708,7 @@ export default function NewProductPage() {
                     <textarea
                     rows={3}
                     {...register("wantedServices")}
+                    data-field="wantedServices"
                     className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
                     placeholder="Ej: Clases de inglés, Fontanería, Asesoría legal..."
                     />
@@ -672,6 +736,7 @@ export default function NewProductPage() {
                 </label>
                 <select
                   {...register("categoryId")}
+                  data-field="categoryId"
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
                 >
                   <option value="">Selecciona una categoría</option>
@@ -694,6 +759,7 @@ export default function NewProductPage() {
                     <input
                       type="text"
                       {...register("otherCategoryLabel")}
+                      data-field="otherCategoryLabel"
                       className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
                       placeholder="Ej: Repuestos de autos, Manualidades, Antigüedades"
                     />
@@ -717,6 +783,7 @@ export default function NewProductPage() {
                   </label>
                   <select
                     {...register("condition")}
+                    data-field="condition"
                     className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
                   >
                     <option value="">Selecciona el estado</option>
@@ -740,7 +807,7 @@ export default function NewProductPage() {
         {step === 3 && (
           <>
             {/* Ubicación */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Departamento
@@ -748,14 +815,38 @@ export default function NewProductPage() {
                 <select
                   value={selectedDepartment}
                   onChange={handleDepartmentChange}
+                  data-field="location"
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
                 >
                   <option value="">Selecciona un departamento</option>
-                  {Object.keys(LOCATIONS).map((dept) => (
+                  {(Object.keys(LOCATIONS) as Department[]).map((dept) => (
                     <option key={dept} value={dept}>
-                      {dept}
+                      {formatDepartmentLabel(dept)}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Provincia
+                </label>
+                <select
+                  value={selectedProvince}
+                  onChange={handleProvinceChange}
+                  disabled={!selectedDepartment}
+                  data-field="location"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors disabled:opacity-50"
+                >
+                  <option value="">Selecciona una provincia</option>
+                    {selectedDepartment &&
+                    (PROVINCES_BY_DEPARTMENT[selectedDepartment] ?? []).map(
+                      (prov) => (
+                        <option key={prov} value={prov}>
+                          {formatLocationPart(prov)}
+                        </option>
+                      )
+                    )}
                 </select>
               </div>
 
@@ -767,13 +858,14 @@ export default function NewProductPage() {
                   value={selectedDistrict}
                   onChange={handleDistrictChange}
                   disabled={!selectedDepartment}
+                  data-field="location"
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors disabled:opacity-50"
                 >
                   <option value="">Selecciona un distrito</option>
                   {selectedDepartment &&
                     LOCATIONS[selectedDepartment].map((dist) => (
                       <option key={dist} value={dist}>
-                        {dist}
+                        {formatLocationPart(dist)}
                       </option>
                     ))}
                 </select>
@@ -803,6 +895,50 @@ export default function NewProductPage() {
                 ))}
               </select>
             </div>
+
+            {trendOptions.length > 0 && (
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tendencias
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Elige las tendencias que describen tu publicación para destacarla en búsquedas.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {trendOptions.map((trend) => (
+                    <label
+                      key={trend.id}
+                      className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
+                        trendTags.includes(trend.id)
+                          ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+                          : "border-gray-200 dark:border-gray-700 hover:border-indigo-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        checked={trendTags.includes(trend.id)}
+                        onChange={(e) => handleTrendToggle(trend.id, e.target.checked)}
+                        data-field="trendTags"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          {trend.icon && <span className="text-lg">{trend.icon}</span>}
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {trend.title}
+                          </span>
+                        </div>
+                        {trend.subtitle && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {trend.subtitle}
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Descripción */}
             <div>

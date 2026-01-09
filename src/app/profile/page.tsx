@@ -10,88 +10,30 @@ import { uploadImage } from "@/lib/storage";
 import { UserProfile } from "@/types/user";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
-import { LOCATIONS, Department } from "@/lib/locations";
-
-const PROVINCES_BY_DEPARTMENT: Record<Department, string[]> = {
-  LIMA: ["Lima"],
-  AREQUIPA: ["Arequipa"],
-};
-
-const getDepartmentFromLabel = (value?: string | null): Department | "" => {
-  if (!value) return "";
-  const normalized = value.trim().toLowerCase();
-  const match = (Object.keys(LOCATIONS) as Department[]).find(
-    (dept) => dept.toLowerCase() === normalized
-  );
-  return match ?? "";
-};
-
-const getProvinceFromLabel = (
-  department: Department,
-  value?: string | null
-) => {
-  const options = PROVINCES_BY_DEPARTMENT[department] ?? [];
-  if (!value) return options[0] ?? "";
-  const normalized = value.trim().toLowerCase();
-  return options.find((opt) => opt.toLowerCase() === normalized) ?? options[0] ?? "";
-};
-
-const getDistrictFromLabel = (
-  department: Department,
-  value?: string | null
-) => {
-  if (!value) return "";
-  const normalized = value.trim().toLowerCase();
-  return (
-    LOCATIONS[department].find(
-      (district) => district.toLowerCase() === normalized
-    ) ?? ""
-  );
-};
-
-const parseAddressFields = (address?: string | null) => {
-  if (!address) return {};
-  const trimmed = address.trim();
-  if (!trimmed) return {};
-
-  const tokens = trimmed
-    .replace(" - ", ",")
-    .split(",")
-    .map((token) => token.trim())
-    .filter(Boolean);
-
-  if (tokens.length === 0) return {};
-
-  const department = getDepartmentFromLabel(tokens[tokens.length - 1]);
-  if (!department) return {};
-
-  let province = "";
-  let district = "";
-  if (tokens.length >= 3) {
-    province = getProvinceFromLabel(department, tokens[tokens.length - 2]);
-    district = getDistrictFromLabel(department, tokens[tokens.length - 3]);
-  } else if (tokens.length >= 2) {
-    province = getProvinceFromLabel(department, "");
-    district = getDistrictFromLabel(department, tokens[tokens.length - 2]);
-  } else {
-    province = getProvinceFromLabel(department, "");
-  }
-
-  return { department, province, district };
-};
+import {
+  LOCATIONS,
+  Department,
+  PROVINCES_BY_DEPARTMENT,
+  formatDepartmentLabel,
+  formatLocationPart,
+  normalizeDepartment,
+  normalizeProvince,
+  normalizeDistrict,
+  parseLocationParts,
+} from "@/lib/locations";
 
 const resolveProfileLocation = (profile: Partial<UserProfile>) => {
-  const fallback = parseAddressFields(profile.address ?? null);
-  const explicitDepartment = getDepartmentFromLabel(profile.department ?? null);
+  const fallback = parseLocationParts(profile.address ?? null);
+  const explicitDepartment = normalizeDepartment(profile.department ?? null);
   if (!explicitDepartment) {
     return fallback;
   }
 
-  const province = getProvinceFromLabel(
+  const province = normalizeProvince(
     explicitDepartment,
     profile.province ?? fallback.province ?? null
   );
-  const district = getDistrictFromLabel(
+  const district = normalizeDistrict(
     explicitDepartment,
     profile.district ?? fallback.district ?? null
   );
@@ -719,9 +661,9 @@ function ProfileContent() {
                     className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
                   >
                     <option value="">Selecciona un departamento</option>
-                    {Object.keys(LOCATIONS).map((dept) => (
+                    {(Object.keys(LOCATIONS) as Department[]).map((dept) => (
                       <option key={dept} value={dept}>
-                        {dept}
+                        {formatDepartmentLabel(dept)}
                       </option>
                     ))}
                   </select>
@@ -740,7 +682,7 @@ function ProfileContent() {
                     <option value="">Selecciona una provincia</option>
                     {provinceOptions.map((province) => (
                         <option key={province} value={province}>
-                          {province}
+                          {formatLocationPart(province)}
                         </option>
                       ))}
                   </select>
@@ -759,7 +701,7 @@ function ProfileContent() {
                     <option value="">Selecciona un distrito</option>
                     {districtOptions.map((district) => (
                         <option key={district} value={district}>
-                          {district}
+                          {formatLocationPart(district)}
                         </option>
                       ))}
                   </select>

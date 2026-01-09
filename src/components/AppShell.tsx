@@ -24,6 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className={[
           hideChrome ? "min-h-screen" : "min-h-[calc(100vh-64px)]",
           !hideChrome ? "pb-24 md:pb-0" : "",
+          "bg-gray-50 dark:bg-gray-950 transition-colors",
         ].join(" ")}
       >
         {children}

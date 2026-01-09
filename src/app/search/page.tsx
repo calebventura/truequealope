@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
@@ -34,6 +34,7 @@ const NEW_BADGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
 
   const initialQuery = searchParams.get("q") || "";
@@ -47,6 +48,7 @@ function SearchContent() {
   const [loading, setLoading] = useState(true);
   const [communityFilters, setCommunityFilters] = useState<string[]>([]);
   const nowTimestamp = Date.now();
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
 
   const activeTrends = useMemo(() => {
     if (selectedTrends.length === 0) return [];
@@ -60,14 +62,73 @@ function SearchContent() {
 
   useEffect(() => {
     setSearchTerm(searchParams.get("q") || "");
+
+    const parseMulti = (key: string) =>
+      searchParams
+        .getAll(key)
+        .flatMap((value) => value.split(",").map((v) => v.trim()))
+        .filter(Boolean);
+
+    setSelectedTrends(parseMulti("trend"));
+    setSelectedCategories(parseMulti("category"));
+    setCommunityFilters(parseMulti("community"));
+    setExchangeFilters(
+      parseMulti("exchange").filter((v): v is ExchangeFilter =>
+        ["sale", "trade", "permuta", "giveaway"].includes(v)
+      )
+    );
+    setListingFilters(
+      parseMulti("listing").filter((v): v is ListingFilter =>
+        ["product", "service"].includes(v)
+      )
+    );
+    setFiltersHydrated(true);
   }, [searchParams]);
+
+  const syncQueryFromState = useCallback(() => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set("q", searchTerm);
+    selectedCategories.forEach((id) => params.append("category", id));
+    selectedTrends.forEach((id) => params.append("trend", id));
+    communityFilters.forEach((id) => params.append("community", id));
+    exchangeFilters.forEach((id) => params.append("exchange", id));
+    listingFilters.forEach((id) => params.append("listing", id));
+
+    const nextQuery = params.toString();
+    const currentQuery = searchParams.toString();
+    if (nextQuery === currentQuery) return;
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    });
+  }, [
+    communityFilters,
+    exchangeFilters,
+    listingFilters,
+    pathname,
+    router,
+    searchParams,
+    searchTerm,
+    selectedCategories,
+    selectedTrends,
+  ]);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
+    syncQueryFromState();
+  }, [
+    syncQueryFromState,
+    searchTerm,
+    selectedCategories,
+    selectedTrends,
+    communityFilters,
+    exchangeFilters,
+    listingFilters,
+  ]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (searchTerm) params.set("q", searchTerm);
-    const queryString = params.toString();
-    router.push(queryString ? `/search?${queryString}` : "/search");
+    syncQueryFromState();
   };
 
   const applyTrendFilters = useCallback(
@@ -76,6 +137,9 @@ function SearchContent() {
 
       const matchesTrend = (product: Product, trend: TrendConfig) => {
         const { filters, productIds } = trend;
+
+        // If the product was etiquetado explícitamente con esta tendencia, ya cuenta.
+        if (product.trendTags?.includes(trend.id)) return true;
 
         if (productIds && productIds.length > 0) {
           if (!product.id || !productIds.includes(product.id)) return false;
@@ -125,6 +189,7 @@ function SearchContent() {
         return true;
       };
 
+      // Basta con que coincida con una de las tendencias seleccionadas.
       return items.filter((product) =>
         activeTrends.some((trend) => matchesTrend(product, trend))
       );
@@ -460,7 +525,7 @@ function SearchContent() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
             {filteredProducts.map((product) => {
               const acceptedTypes = getAcceptedExchangeTypes(product);
               const isGiveaway = acceptedTypes.includes("giveaway");
@@ -487,7 +552,8 @@ function SearchContent() {
               let modeBadge = null;
               if (isGiveaway) modeBadge = "Regalo";
               else if (isPermuta) modeBadge = "Permuta";
-              else if (acceptsTrade && acceptsMoney) modeBadge = "Venta / Trueque";
+              else if (acceptsMoney && acceptsTrade) modeBadge = "Venta / Trueque";
+              else if (acceptsMoney) modeBadge = "Venta";
               else if (acceptsTrade) modeBadge = "Trueque";
 
               return (

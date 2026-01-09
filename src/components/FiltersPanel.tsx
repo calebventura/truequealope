@@ -137,7 +137,7 @@ export function FiltersPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4 mb-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         {title ? (
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -179,7 +179,7 @@ export function FiltersPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         {pills.length > 0
           ? pills.map((pill) => (
               <button

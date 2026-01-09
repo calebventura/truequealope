@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useMemo, useState, use } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,10 +10,19 @@ import { db } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Product, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS } from "@/lib/constants";
-import { LOCATIONS, Department } from "@/lib/locations";
+import {
+  LOCATIONS,
+  Department,
+  PROVINCES_BY_DEPARTMENT,
+  formatDepartmentLabel,
+  formatLocationPart,
+  buildLocationLabel,
+  parseLocationParts,
+} from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
 import { COMMUNITIES } from "@/lib/communities";
 import { AlertModal } from "@/components/ui/AlertModal";
+import { getActiveTrends } from "@/lib/trends";
 
 const productSchema = z
   .object({
@@ -23,10 +32,11 @@ const productSchema = z
     wanted: z.string().optional(),
     categoryId: z.string().min(1, "Selecciona una categoria"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
-    location: z.string().min(3, "Ingresa una ubicacion valida"),
+    location: z.string().min(3, "Selecciona departamento, provincia y distrito"),
     communityId: z.string().nullable().optional(),
     otherCategoryLabel: z.string().optional(),
     exchangeMode: z.enum(["sale", "giveaway", "trade", "permuta"]),
+    trendTags: z.array(z.string()).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.categoryId === "other") {
@@ -83,6 +93,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
   // Location State
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
+  const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
 
   const {
@@ -97,6 +108,24 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   });
   const categoryId = watch("categoryId");
   const exchangeModeWatch = watch("exchangeMode");
+  const trendTags = watch("trendTags") || [];
+  const trendOptions = useMemo(() => getActiveTrends(), []);
+
+  const updateLocationValue = (
+    department: Department | "",
+    province: string,
+    district: string
+  ) => {
+    if (department && province && district) {
+      setValue(
+        "location",
+        buildLocationLabel(district, province, department),
+        { shouldValidate: true }
+      );
+    } else {
+      setValue("location", "", { shouldValidate: true });
+    }
+  };
 
   const deriveExchangeMode = (product: Product): "sale" | "giveaway" | "trade" | "permuta" => {
     const accepted = product.acceptedExchangeTypes || [];
@@ -135,6 +164,18 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
         const exchangeMode = deriveExchangeMode(data);
 
+        const parsedLocation = parseLocationParts(data.location);
+        const formattedLocation =
+          parsedLocation.department &&
+          parsedLocation.province &&
+          parsedLocation.district
+            ? buildLocationLabel(
+                parsedLocation.district,
+                parsedLocation.province,
+                parsedLocation.department
+              )
+            : data.location;
+
         reset({
           title: data.title,
           description: data.description,
@@ -143,27 +184,15 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           categoryId: data.categoryId,
           otherCategoryLabel: data.otherCategoryLabel ?? "",
           condition: data.condition,
-          location: data.location,
+          location: formattedLocation,
           communityId: data.communityId ?? "",
           exchangeMode,
+          trendTags: data.trendTags ?? [],
         } as ProductForm);
 
-        // Parse location
-        if (data.location) {
-          const parts = data.location.split(",").map((s) => s.trim());
-          if (parts.length === 2) {
-            const [dist, dept] = parts;
-            if (Object.keys(LOCATIONS).includes(dept)) {
-              const departmentKey = dept as Department;
-              setSelectedDepartment(departmentKey);
-              // Verify district exists in department (cast to string array for TS)
-              const districts = LOCATIONS[departmentKey] as readonly string[];
-              if (districts.includes(dist)) {
-                setSelectedDistrict(dist);
-              }
-            }
-          }
-        }
+        setSelectedDepartment(parsedLocation.department);
+        setSelectedProvince(parsedLocation.province);
+        setSelectedDistrict(parsedLocation.district);
       } catch (err) {
         console.error(err);
         setError("Error cargando el producto");
@@ -187,16 +216,29 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dept = e.target.value as Department | "";
     setSelectedDepartment(dept);
+    const defaultProvince = dept ? PROVINCES_BY_DEPARTMENT[dept]?.[0] ?? "" : "";
+    setSelectedProvince(defaultProvince);
     setSelectedDistrict("");
-    setValue("location", "", { shouldValidate: true });
+    updateLocationValue(dept, defaultProvince, "");
+  };
+
+  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const province = e.target.value;
+    setSelectedProvince(province);
+    updateLocationValue(selectedDepartment, province, selectedDistrict);
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dist = e.target.value;
     setSelectedDistrict(dist);
-    if (selectedDepartment && dist) {
-      setValue("location", `${dist}, ${selectedDepartment}`, { shouldValidate: true });
-    }
+    updateLocationValue(selectedDepartment, selectedProvince, dist);
+  };
+
+  const handleTrendToggle = (id: string, checked: boolean) => {
+    const current = new Set(trendTags);
+    if (checked) current.add(id);
+    else current.delete(id);
+    setValue("trendTags", Array.from(current), { shouldValidate: false });
   };
 
   const onSubmit = async (data: ProductForm) => {
@@ -218,6 +260,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 ...data,
                 visibility: "public",
                 communityId: selectedCommunity,
+                trendTags: data.trendTags ?? [],
                 exchangeMode: undefined, // evitar guardar el helper directo
                 acceptedExchangeTypes: (() => {
                   const mode = data.exchangeMode;
@@ -360,20 +403,42 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Departamento</label>
             <select
               value={selectedDepartment}
               onChange={handleDepartmentChange}
+              data-field="location"
               className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Selecciona un departamento</option>
-              {Object.keys(LOCATIONS).map((dept) => (
+              {(Object.keys(LOCATIONS) as Department[]).map((dept) => (
                 <option key={dept} value={dept}>
-                  {dept}
+                  {formatDepartmentLabel(dept)}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Provincia</label>
+            <select
+              value={selectedProvince}
+              onChange={handleProvinceChange}
+              disabled={!selectedDepartment}
+              data-field="location"
+              className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md disabled:opacity-50 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            >
+              <option value="">Selecciona una provincia</option>
+              {selectedDepartment &&
+                (PROVINCES_BY_DEPARTMENT[selectedDepartment] ?? []).map(
+                  (prov) => (
+                    <option key={prov} value={prov}>
+                      {formatLocationPart(prov)}
+                    </option>
+                  )
+                )}
             </select>
           </div>
 
@@ -383,22 +448,61 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               value={selectedDistrict}
               onChange={handleDistrictChange}
               disabled={!selectedDepartment}
+              data-field="location"
               className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md disabled:opacity-50 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Selecciona un distrito</option>
               {selectedDepartment &&
                 LOCATIONS[selectedDepartment].map((dist) => (
                   <option key={dist} value={dist}>
-                    {dist}
+                    {formatLocationPart(dist)}
                   </option>
                 ))}
             </select>
           </div>
         </div>
-        {/* Hidden input to register location for validation if needed, or just rely on setValue */}
-        {/* We removed the input, so errors.location might not be displayed if we don't add it back or handle it */}
         {errors.location && (
             <p className="text-xs text-red-500 mt-1">{errors.location.message}</p>
+        )}
+
+        {trendOptions.length > 0 && (
+          <div className="border border-gray-200 dark:border-gray-800 rounded-md p-3 space-y-2">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Tendencias</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Marca las tendencias que encajan con tu publicaci¢n.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {trendOptions.map((trend) => (
+                <label
+                  key={trend.id}
+                  className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
+                    trendTags.includes(trend.id)
+                      ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+                      : "border-gray-200 dark:border-gray-700 hover:border-indigo-200"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    checked={trendTags.includes(trend.id)}
+                    onChange={(e) => handleTrendToggle(trend.id, e.target.checked)}
+                    data-field="trendTags"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {trend.icon && <span className="text-lg">{trend.icon}</span>}
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {trend.title}
+                      </span>
+                    </div>
+                    {trend.subtitle && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{trend.subtitle}</p>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
         )}
 
         <div className="border border-gray-200 rounded-md p-3 space-y-2">

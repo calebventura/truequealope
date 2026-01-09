@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
@@ -16,6 +16,7 @@ import { getCommunityById } from "@/lib/communities";
 import { createPermutaOffer } from "@/lib/offers";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
+import { getTrendById, isTrendActive } from "@/lib/trends";
 
 const resolveProfileDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -64,6 +65,18 @@ export default function ProductDetailPage() {
     tone?: "info" | "error" | "success";
   } | null>(null);
   const [confirmBuyOpen, setConfirmBuyOpen] = useState(false);
+
+  const trendBadges = useMemo(() => {
+    if (!product?.trendTags || product.trendTags.length === 0) return [];
+    return product.trendTags
+      .map((id) => getTrendById(id))
+      .filter((trend): trend is NonNullable<ReturnType<typeof getTrendById>> => Boolean(trend && isTrendActive(trend)))
+      .map((trend) => ({
+        id: trend.id,
+        title: trend.title,
+        icon: trend.icon,
+      }));
+  }, [product]);
 
   const showAlert = (
     description: string,
@@ -771,6 +784,19 @@ export default function ProductDetailPage() {
                         Vendido
                       </span>
                     )}
+                    {trendBadges.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {trendBadges.map((trend) => (
+                          <span
+                            key={trend.id}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-800"
+                          >
+                            {trend.icon && <span>{trend.icon}</span>}
+                            {trend.title}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     {product.createdAt.toLocaleDateString()}
@@ -845,21 +871,21 @@ export default function ProductDetailPage() {
                   <p>{product.description || "Sin descripción."}</p>
                 </div>
 
-                <div className="mb-8 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40 p-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="relative h-14 w-14 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-center">
+                <div className="mb-8 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/70 p-5 shadow-sm">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="relative h-16 w-16 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-center">
                         {sellerPhoto ? (
                           <Image
                             src={sellerPhoto}
                             alt={sellerDisplayName}
                             fill
-                            sizes="56px"
+                            sizes="64px"
                             className="object-cover"
                           />
                         ) : (
                           <svg
-                            className="h-7 w-7 text-gray-400 dark:text-gray-600"
+                            className="h-8 w-8 text-gray-400 dark:text-gray-600"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -873,72 +899,99 @@ export default function ProductDetailPage() {
                           </svg>
                         )}
                       </div>
-                      <div>
+                      <div className="space-y-1">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                           Publicado por
                         </p>
                         <p className="text-lg font-semibold text-gray-900 dark:text-white">
                           {sellerDisplayName}
                         </p>
-                        {sellerSinceLabel && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Miembro desde {sellerSinceLabel}
-                          </p>
-                        )}
-                        {sellerLocation && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Ubicacion: {sellerLocation}
-                          </p>
-                        )}
+                        <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
+                          {sellerSinceLabel && (
+                            <span className="flex items-center gap-1">
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              Miembro desde {sellerSinceLabel}
+                            </span>
+                          )}
+                          {sellerLocation && (
+                            <span className="flex items-center gap-1">
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4s-3 1.567-3 3.5S10.343 11 12 11z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19.5 8.5c0 7-7.5 11.5-7.5 11.5S4.5 15.5 4.5 8.5A7.5 7.5 0 1119.5 8.5z"
+                                />
+                              </svg>
+                              {sellerLocation}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {sellerRating != null && (
-                      <div className="flex items-center gap-2 rounded-full bg-white dark:bg-gray-900 px-3 py-1 text-sm text-gray-700 dark:text-gray-200 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold">
                         <svg
-                          className="h-4 w-4 text-yellow-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
                         >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.369 2.449a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.54 1.118L10.5 15.347a1 1 0 00-1.175 0l-3.352 2.429c-.784.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.99 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.957z" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
                         </svg>
-                        <span className="font-semibold">
-                          {sellerRating.toFixed(1)}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          / 5
-                        </span>
-                      </div>
-                    )}
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
+                        {product.viewCount ?? 0} visitas
+                      </span>
+                      {sellerRating != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold">
                           <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                            className="h-4 w-4 text-yellow-500"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.369 2.449a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.54 1.118L10.5 15.347a1 1 0 00-1.175 0l-3.352 2.429c-.784.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.99 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.957z" />
                           </svg>
-                          {product.viewCount ?? 0} visitas
+                          {sellerRating.toFixed(1)} / 5
                         </span>
-                      </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowSellerDetails(true)}
-                        className="inline-flex items-center justify-center gap-2 rounded-md border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-indigo-700 dark:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 px-3.5 py-2 text-sm font-semibold text-indigo-700 dark:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-colors"
                       >
                         <svg
                           className="w-4 h-4"
