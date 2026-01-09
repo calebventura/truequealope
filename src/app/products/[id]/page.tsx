@@ -553,10 +553,22 @@ export default function ProductDetailPage() {
   const isMixed = acceptsMoney && acceptsTrade;
 
   const sellerIsOwner = user?.uid === product?.sellerId;
-  const hasCommunity = !!product?.communityId;
-  const communityLabel = product?.communityId
-    ? getCommunityById(product.communityId)?.name ?? "Comunidad"
-    : "Público";
+  const productCommunityIds = product
+    ? Array.from(
+        new Set(
+          [product.communityId, ...(product.communityIds ?? [])].filter(
+            (id): id is string => Boolean(id)
+          )
+        )
+      )
+    : [];
+  const hasCommunity = productCommunityIds.length > 0;
+  const communityLabels =
+    productCommunityIds.length > 0
+      ? productCommunityIds.map(
+          (id) => getCommunityById(id)?.name ?? "Comunidad"
+        )
+      : ["Público"];
   const whatsappDisabled =
     contacting ||
     buying ||
@@ -763,15 +775,18 @@ export default function ProductDetailPage() {
                         {modeBadge}
                       </span>
                     )}
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        hasCommunity
-                          ? "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
-                      }`}
-                    >
-                      {communityLabel}
-                    </span>
+                    {communityLabels.map((label, idx) => (
+                      <span
+                        key={`${label}-${idx}`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          hasCommunity
+                            ? "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                        }`}
+                      >
+                        {label}
+                      </span>
+                    ))}
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
                       {categoryLabel}
                     </span>

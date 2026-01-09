@@ -33,7 +33,7 @@ const productSchema = z
     categoryId: z.string().min(1, "Selecciona una categoria"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
     location: z.string().min(3, "Selecciona departamento, provincia y distrito"),
-    communityId: z.string().nullable().optional(),
+    communityIds: z.array(z.string()).optional(),
     otherCategoryLabel: z.string().optional(),
     exchangeMode: z.enum(["sale", "giveaway", "trade", "permuta"]),
     trendTags: z.array(z.string()).optional(),
@@ -109,6 +109,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const categoryId = watch("categoryId");
   const exchangeModeWatch = watch("exchangeMode");
   const trendTags = watch("trendTags") || [];
+  const communityIds = watch("communityIds") || [];
   const trendOptions = useMemo(() => getActiveTrends(), []);
 
   const updateLocationValue = (
@@ -176,19 +177,19 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               )
             : data.location;
 
-        reset({
-          title: data.title,
-          description: data.description,
-          price: data.price ?? undefined,
-          wanted: data.wanted?.join(", "),
-          categoryId: data.categoryId,
-          otherCategoryLabel: data.otherCategoryLabel ?? "",
-          condition: data.condition,
-          location: formattedLocation,
-          communityId: data.communityId ?? "",
-          exchangeMode,
-          trendTags: data.trendTags ?? [],
-        } as ProductForm);
+         reset({
+           title: data.title,
+           description: data.description,
+           price: data.price ?? undefined,
+           wanted: data.wanted?.join(", "),
+           categoryId: data.categoryId,
+           otherCategoryLabel: data.otherCategoryLabel ?? "",
+           condition: data.condition,
+           location: formattedLocation,
+           communityIds: data.communityIds ?? (data.communityId ? [data.communityId] : []),
+           exchangeMode,
+           trendTags: data.trendTags ?? [],
+         } as ProductForm);
 
         setSelectedDepartment(parsedLocation.department);
         setSelectedProvince(parsedLocation.province);
@@ -241,11 +242,18 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     setValue("trendTags", Array.from(current), { shouldValidate: false });
   };
 
+  const handleCommunityToggle = (id: string, checked: boolean) => {
+    const current = new Set(communityIds);
+    if (checked) current.add(id);
+    else current.delete(id);
+    setValue("communityIds", Array.from(current), { shouldValidate: false });
+  };
+
   const onSubmit = async (data: ProductForm) => {
     setSaving(true);
     setError("");
 
-    const selectedCommunity = data.communityId || null;
+    const selectedCommunities = data.communityIds?.filter(Boolean) ?? [];
     const trimmedOther = data.otherCategoryLabel?.trim() || "";
 
     try {
@@ -258,8 +266,9 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             },
             body: JSON.stringify({
                 ...data,
-                visibility: "public",
-                communityId: selectedCommunity,
+                visibility: selectedCommunities.length > 0 ? "community" : "public",
+                communityId: selectedCommunities[0] ?? null,
+                communityIds: selectedCommunities,
                 trendTags: data.trendTags ?? [],
                 exchangeMode: undefined, // evitar guardar el helper directo
                 acceptedExchangeTypes: (() => {
@@ -506,18 +515,33 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         )}
 
         <div className="border border-gray-200 rounded-md p-3 space-y-2">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Comunidad (opcional)</p>
-          <select
-            {...register("communityId")}
-            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-sm"
-          >
-            <option value="">Público (todas las comunidades)</option>
-            {COMMUNITIES.map((community) => (
-              <option key={community.id} value={community.id}>
-                {community.name}
-              </option>
-            ))}
-          </select>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Comunidades (opcional)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Si eliges una o más, la publicación será visible solo dentro de esas comunidades.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {COMMUNITIES.map((community) => {
+              const checked = communityIds.includes(community.id);
+              return (
+                <label
+                  key={community.id}
+                  className={`flex items-center gap-2 rounded-md border p-2 text-sm cursor-pointer transition-colors ${
+                    checked
+                      ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+                      : "border-gray-200 dark:border-gray-700 hover:border-indigo-200"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => handleCommunityToggle(community.id, e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <span className="text-gray-800 dark:text-gray-100">{community.name}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         <div>

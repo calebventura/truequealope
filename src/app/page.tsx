@@ -225,9 +225,18 @@ function HomePageContent() {
   );
   const communityFiltered = categoryFiltered.filter((product) => {
     if (communityFilters.length === 0) return true;
-    const isPublic = (product.visibility ?? "public") !== "community";
+    const productCommunities = (
+      [product.communityId, ...(product.communityIds ?? [])].filter(
+        (id): id is string => Boolean(id)
+      )
+    );
+    const isPublic =
+      (product.visibility ?? "public") !== "community" ||
+      productCommunities.length === 0;
     if (includePublic && isPublic) return true;
-    if (product.communityId && communityIds.has(product.communityId)) return true;
+    for (const cid of productCommunities) {
+      if (communityIds.has(cid)) return true;
+    }
     return false;
   });
 

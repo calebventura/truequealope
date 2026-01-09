@@ -38,7 +38,7 @@ const productSchema = z
     
     listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona una opción de intercambio"),
-    communityId: z.string().nullable().optional(),
+    communityIds: z.array(z.string()).optional(),
 
     price: z.number().min(0, "El valor no puede ser negativo").optional(),
     
@@ -174,7 +174,7 @@ export default function NewProductPage() {
       listingType: "product",
       acceptedExchangeTypes: [], // Start empty to force selection
       condition: "used",
-      communityId: null,
+      communityIds: [],
       otherCategoryLabel: "",
       trendTags: [],
     },
@@ -182,7 +182,7 @@ export default function NewProductPage() {
 
   const listingType = watch("listingType");
   const acceptedExchangeTypes = watch("acceptedExchangeTypes");
-  const communityId = watch("communityId");
+  const communityIds = watch("communityIds") || [];
   const categoryId = watch("categoryId");
   const trendTags = watch("trendTags") || [];
   const trendOptions = useMemo(() => getActiveTrends(), []);
@@ -371,6 +371,13 @@ export default function NewProductPage() {
     setValue("trendTags", Array.from(current), { shouldValidate: false });
   };
 
+  const handleCommunityToggle = (id: string, checked: boolean) => {
+    const current = new Set(communityIds);
+    if (checked) current.add(id);
+    else current.delete(id);
+    setValue("communityIds", Array.from(current), { shouldValidate: false });
+  };
+
   const onSubmit = async (data: ProductForm) => {
     setGeneralError("");
 
@@ -396,7 +403,7 @@ export default function NewProductPage() {
       return;
     }
 
-    const selectedCommunity = data.communityId || null;
+    const selectedCommunities = data.communityIds?.filter(Boolean) ?? [];
 
     setUploading(true);
     try {
@@ -449,8 +456,9 @@ export default function NewProductPage() {
         wanted: wantedItems,
         listingType: data.listingType,
         acceptedExchangeTypes: data.acceptedExchangeTypes,
-        visibility: "public",
-        communityId: selectedCommunity,
+        visibility: selectedCommunities.length > 0 ? "community" : "public",
+        communityId: selectedCommunities[0] ?? null,
+        communityIds: selectedCommunities,
         trendTags: data.trendTags ?? [],
       };
 
@@ -880,20 +888,38 @@ export default function NewProductPage() {
             {/* Comunidad (opcional) */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Comunidad (opcional)
+                Comunidades (opcional)
               </label>
-              <select
-                {...register("communityId")}
-                value={communityId ?? ""}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-colors"
-              >
-                <option value="">Público (todas las comunidades)</option>
-                {COMMUNITIES.map((community) => (
-                  <option key={community.id} value={community.id}>
-                    {community.name}
-                  </option>
-                ))}
-              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Si seleccionas una o más, tu publicación solo será visible en esas comunidades.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {COMMUNITIES.map((community) => {
+                  const checked = communityIds.includes(community.id);
+                  return (
+                    <label
+                      key={community.id}
+                      className={`flex items-center gap-2 rounded-md border p-2 text-sm cursor-pointer transition-colors ${
+                        checked
+                          ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+                          : "border-gray-200 dark:border-gray-700 hover:border-indigo-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          handleCommunityToggle(community.id, e.target.checked)
+                        }
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <span className="text-gray-800 dark:text-gray-100">
+                        {community.name}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             {trendOptions.length > 0 && (

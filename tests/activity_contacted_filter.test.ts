@@ -26,6 +26,7 @@ describe("Activity Contacted list", () => {
       id: "p1",
       title: "Activo",
       status: "active",
+      communityIds: ["c1"],
       sellerId: "u1",
       categoryId: "cat",
       listingType: "product",
@@ -61,5 +62,6 @@ describe("Activity Contacted list", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].productId).toBe("p1");
+    expect(result[0].product?.communityIds).toContain("c1");
   });
 });

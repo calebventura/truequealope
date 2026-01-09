@@ -40,5 +40,6 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - Home/Search listings now reuse a shared `ProductCard` component (no duplicated card markup).
 - Home page wraps content in a Suspense fallback to support `useSearchParams` during prerender/build.
 - Activity (seller): active/reserved items display by default; a toggle reveals concretadas (sold) separately.
-- Activity (buyer): “Contactados” omits deleted posts; “Mis compras” still lists them.
+- Activity (buyer): "Contactados" omits deleted posts; "Mis compras" still lists them.
 - Deleted products no longer render in detail view (redirects with notice) or buyer activity feed.
+- Products can belong to multiple communities on create/edit; detail view now displays all assigned communities.
