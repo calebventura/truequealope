@@ -68,6 +68,10 @@ function SellerActivity({ userId }: { userId: string }) {
     items: string;
     price: string;
   } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    productId: string;
+    title: string;
+  } | null>(null);
   const [dealModalError, setDealModalError] = useState<string | null>(null);
   const [dealModalSaving, setDealModalSaving] = useState(false);
   const [alertModal, setAlertModal] = useState<{
@@ -170,7 +174,7 @@ function SellerActivity({ userId }: { userId: string }) {
         }) as Product[];
 
         const visibleProducts = productsData
-          .filter((p) => p.status !== "deleted" && p.status !== "sold")
+          .filter((p) => p.status !== "deleted")
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(visibleProducts);
@@ -220,6 +224,7 @@ function SellerActivity({ userId }: { userId: string }) {
     productId: string,
     newStatus: ProductStatus,
     options?: {
+      skipPrompt?: boolean;
       reservedForContact?: string | null;
       reservedForUserId?: string | null;
       finalizeData?: {
@@ -239,7 +244,7 @@ function SellerActivity({ userId }: { userId: string }) {
       return;
     }
 
-    const skipConfirm = newStatus === "sold" && options?.finalizeData;
+    const skipConfirm = options?.skipPrompt || (newStatus === "sold" && options?.finalizeData);
     if (!skipConfirm) {
       if (
         !confirm(
@@ -357,7 +362,7 @@ function SellerActivity({ userId }: { userId: string }) {
     }
   };
   const displayedProducts = products.filter(
-    (p) => p.status === "active" || p.status === "reserved"
+    (p) => p.status === "active" || p.status === "reserved" || p.status === "sold"
   );
 
   const getAcceptedTypes = (product: Product) => {
@@ -576,7 +581,7 @@ function SellerActivity({ userId }: { userId: string }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
@@ -607,6 +612,16 @@ function SellerActivity({ userId }: { userId: string }) {
             </dd>
           </div>
         </div>
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
+          <div className="px-4 py-5 sm:p-6">
+            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+              Concretadas
+            </dt>
+            <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
+              {products.filter((p) => p.status === "sold").length}
+            </dd>
+          </div>
+        </div>
       </div>
 
       {loadingProducts ? (
@@ -627,7 +642,7 @@ function SellerActivity({ userId }: { userId: string }) {
             />
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-            No tienes publicaciones activas
+            No tienes publicaciones para mostrar
           </h3>
           <div className="mt-6">
             <Link href="/products/new">
@@ -813,7 +828,9 @@ function SellerActivity({ userId }: { userId: string }) {
                   </button>
                 )}
                 <button
-                  onClick={() => handleStatusChange(product.id!, "deleted")}
+                  onClick={() =>
+                    setDeleteModal({ productId: product.id!, title: product.title })
+                  }
                   className="flex-1 md:flex-none text-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
                 >
                   Eliminar
@@ -976,6 +993,53 @@ function SellerActivity({ userId }: { userId: string }) {
       tone={alertModal?.tone}
       onClose={() => setAlertModal(null)}
     />
+    {deleteModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm uppercase text-gray-500 dark:text-gray-400 tracking-wide">
+                Confirmar eliminación
+              </p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                ¿Eliminar esta publicación?
+              </h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 break-words">
+                {deleteModal.title}
+              </p>
+            </div>
+            <button
+              onClick={() => setDeleteModal(null)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              aria-label="Cerrar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              onClick={() => setDeleteModal(null)}
+              className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={async () => {
+                if (!deleteModal) return;
+                await handleStatusChange(deleteModal.productId, "deleted", { skipPrompt: true });
+                setDeleteModal(null);
+              }}
+              className="px-4 py-2 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     {confirmOrderModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800 p-6 space-y-4">
@@ -1135,14 +1199,16 @@ function BuyerActivity({ userId }: { userId: string }) {
           };
         }) as Order[];
 
-        ordersData.sort((a, b) => {
+        const filteredOrders = ordersData.filter((order) => order.status !== "deleted");
+
+        filteredOrders.sort((a, b) => {
           const dateA = toDate(a.createdAt) ?? new Date();
           const dateB = toDate(b.createdAt) ?? new Date();
           return dateB.getTime() - dateA.getTime();
         });
-        setOrders(ordersData);
+        setOrders(filteredOrders);
 
-        const sellerIds = Array.from(new Set(ordersData.map((o) => o.sellerId)));
+        const sellerIds = Array.from(new Set(filteredOrders.map((o) => o.sellerId)));
         const contactEntries = await Promise.all(
           sellerIds.map(async (sellerId) => {
             try {
@@ -1302,39 +1368,46 @@ function BuyerActivity({ userId }: { userId: string }) {
           </div>
         ) : (
           <ul className="divide-y dark:divide-gray-700">
-            {orders.map((order) => (
-              <li key={order.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-white truncate">
-                      {order.productTitle}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {toDate(order.createdAt)?.toLocaleDateString() ?? ""}
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-gray-900 dark:text-gray-100">
-                      S/. {order.price.toLocaleString()}
-                    </p>
+            {orders.map((order) => {
+              const priceText =
+                typeof order.price === "number"
+                  ? order.price.toLocaleString()
+                  : "N/D";
+
+              return (
+                <li key={order.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-white truncate">
+                        {order.productTitle}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {toDate(order.createdAt)?.toLocaleDateString() ?? ""}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-gray-900 dark:text-gray-100">
+                        S/. {priceText}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 capitalize">
+                      {order.status === "completed" ? "Completado" : order.status}
+                    </span>
                   </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 capitalize">
-                    {order.status === "completed" ? "Completado" : order.status}
-                  </span>
-                </div>
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => handleContactSeller(order)}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    Contactar vendedor
-                  </button>
-                  <Link href={`/products/${order.productId}`}>
-                    <Button size="sm" variant="outline" className="dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700">
-                      Ver producto
-                    </Button>
-                  </Link>
-                </div>
-              </li>
-            ))}
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleContactSeller(order)}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Contactar vendedor
+                    </button>
+                    <Link href={`/products/${order.productId}`}>
+                      <Button size="sm" variant="outline" className="dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700">
+                        Ver producto
+                      </Button>
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

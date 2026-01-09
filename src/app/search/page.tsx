@@ -19,17 +19,12 @@ import {
   matchesExchangeFilter,
   matchesListingFilter,
 } from "@/lib/productFilters";
-import Link from "next/link";
-import Image from "next/image";
-import { ImageCarousel } from "@/components/ui/ImageCarousel";
 import { useAuth } from "@/hooks/useAuth";
 import { FiltersPanel } from "@/components/FiltersPanel";
 import {
   COMMUNITIES,
-  getCommunityById,
 } from "@/lib/communities";
-
-const NEW_BADGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+import { ProductCard } from "@/components/ProductCard";
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -526,152 +521,15 @@ function SearchContent() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-            {filteredProducts.map((product) => {
-              const acceptedTypes = getAcceptedExchangeTypes(product);
-              const isGiveaway = acceptedTypes.includes("giveaway");
-              const isPermuta = acceptedTypes.includes("exchange_plus_cash");
-              const acceptsMoney = acceptedTypes.includes("money");
-              const isOwn = Boolean(user && product.sellerId === user.uid);
-              const isNew =
-                product.status !== "sold" &&
-                nowTimestamp - product.createdAt.getTime() < NEW_BADGE_WINDOW_MS;
-              const acceptsTrade =
-                acceptedTypes.includes("product") ||
-                acceptedTypes.includes("service") ||
-                acceptedTypes.includes("exchange_plus_cash");
-              const communityLabel =
-                product.visibility === "community" && product.communityId
-                  ? getCommunityById(product.communityId)?.name ?? "Comunidad privada"
-                  : "Público";
-
-              const wantedText =
-                product.wanted && product.wanted.length > 0
-                  ? product.wanted.slice(0, 2).join(", ")
-                  : null;
-              
-              let modeBadge = null;
-              if (isGiveaway) modeBadge = "Regalo";
-              else if (isPermuta) modeBadge = "Permuta";
-              else if (acceptsMoney && acceptsTrade) modeBadge = "Venta / Trueque";
-              else if (acceptsMoney) modeBadge = "Venta";
-              else if (acceptsTrade) modeBadge = "Trueque";
-
-              return (
-                <Link
-                  key={product.id}
-                  href={`/products/${product.id}`}
-                  className="group"
-                >
-                  <div
-                    className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 h-full flex flex-col border ${
-                      isOwn
-                        ? "border-indigo-200 dark:border-indigo-900 ring-1 ring-indigo-200/60 dark:ring-indigo-900/60"
-                        : "border-transparent dark:border-gray-800"
-                    }`}
-                  >
-                    <div className="relative h-48 w-full bg-gray-200 dark:bg-gray-800">
-                      <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                        {isOwn && (
-                          <span className="bg-emerald-100 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
-                            Tu publicacion
-                          </span>
-                        )}
-                        {isNew && (
-                          <span className="bg-yellow-100 dark:bg-yellow-900/80 text-yellow-800 dark:text-yellow-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
-                            Nuevo
-                          </span>
-                        )}
-                        {modeBadge && (
-                          <span className="bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-100 text-xs font-bold px-2 py-1 rounded-full uppercase shadow-sm">
-                            {modeBadge}
-                          </span>
-                        )}
-                      </div>
-                      {product.images && product.images.length > 0 ? (
-                        product.images.length > 1 ? (
-                          <ImageCarousel images={product.images} alt={product.title} />
-                        ) : (
-                          <Image
-                            src={product.images[0]}
-                            alt={product.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-200"
-                          />
-                        )
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800">
-                          <span className="text-4xl">
-                            {product.listingType === 'service' ? '🛠️' : '📦'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col flex-grow">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">
-                        {product.title}
-                      </h3>
-
-                      {isGiveaway ? (
-                        <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">
-                          Gratis
-                        </p>
-                      ) : acceptsMoney && product.price != null ? (
-                        <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                          {isPermuta
-                            ? `S/. ${product.price.toLocaleString()} (Ref.)`
-                            : `S/. ${product.price.toLocaleString()}`}
-                        </p>
-                      ) : (
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">
-                          {acceptsTrade ? "Solo trueque" : "Consultar"}
-                        </p>
-                      )}
-
-                      {(acceptsTrade || isPermuta) && wantedText && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
-                          Busco: {wantedText}
-                        </p>
-                      )}
-
-                      <div className="mt-auto pt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                        <span className="capitalize bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">
-                          {CATEGORIES.find((c) => c.id === product.categoryId)
-                            ?.name || "Otro"}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                              />
-                            </svg>
-                            {product.viewCount ?? 0}
-                          </span>
-                          <span>{product.location}</span>
-                          <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-medium">
-                            {communityLabel}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                href={`/products/${product.id}`}
+                currentUserId={user?.uid ?? null}
+                nowTimestamp={nowTimestamp}
+              />
+            ))}
           </div>
         )}
       </div>

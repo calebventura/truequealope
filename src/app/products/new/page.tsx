@@ -764,7 +764,7 @@ export default function NewProductPage() {
                       placeholder="Ej: Repuestos de autos, Manualidades, Antigüedades"
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Si no encuentras tu categor¡a, escribe c¢mo la llamar¡as.
+                      Si no encuentras tu categor¡a, escribe cómo la llamar¡as.
                     </p>
                     {errors.otherCategoryLabel && (
                       <p className="mt-1 text-xs text-red-500 dark:text-red-400">
