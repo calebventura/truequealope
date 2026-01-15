@@ -111,19 +111,60 @@ export function ProductCard({
             {product.title}
           </h2>
 
-          {isGiveaway ? (
-            <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-              GRATIS (Regalo)
-            </p>
-          ) : acceptsMoney && product.price != null ? (
-            <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-              S/. {product.price.toLocaleString()}
-            </p>
-          ) : (
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              {acceptsTrade ? "Solo trueque/intercambio" : "Consultar precio"}
-            </p>
-          )}
+          {(() => {
+            const referentialPrice =
+              typeof product.price === "number" ? product.price : null;
+
+            if (isGiveaway) {
+              return (
+                <div className="flex flex-col gap-1">
+                  <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    Regalo
+                  </p>
+                  {referentialPrice !== null && (
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                      Valor referencial: S/. {referentialPrice.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              );
+            }
+
+            if (isPermuta && referentialPrice !== null) {
+              return (
+                <div className="flex flex-col gap-1">
+                  <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                    S/. {referentialPrice.toLocaleString()}
+                  </p>
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                    Precio referencial total
+                  </p>
+                </div>
+              );
+            }
+
+            if (acceptsMoney && referentialPrice !== null) {
+              return (
+                <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                  S/. {referentialPrice.toLocaleString()}
+                </p>
+              );
+            }
+
+            if (referentialPrice !== null) {
+              return (
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Valor referencial: S/. {referentialPrice.toLocaleString()}
+                </p>
+              );
+            }
+
+            return (
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                {acceptsTrade ? "Solo trueque/intercambio" : "Consultar precio"}
+              </p>
+            );
+          })()}
 
           {wantedText && (
             <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">

@@ -40,7 +40,12 @@ const productSchema = z
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona una opción de intercambio"),
     communityIds: z.array(z.string()).optional(),
 
-    price: z.number().min(0, "El valor no puede ser negativo").optional(),
+    price: z
+      .number({
+        required_error: "Ingresa el valor referencial",
+        invalid_type_error: "Ingresa el valor referencial",
+      })
+      .gt(0, "Ingresa un valor mayor a 0"),
     
     // Separate fields for specific exchange wants
     wantedProducts: z.string().optional(),
@@ -59,19 +64,8 @@ const productSchema = z
   .superRefine((data, ctx) => {
     const types = data.acceptedExchangeTypes || [];
     
-    // 1. Dinero (Solo Venta)
-    if (types.includes("money")) {
-        if (!data.price || data.price <= 0) {
-             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el precio de venta" });
-        }
-    }
-
     // 2. Permuta (Mix)
     if (types.includes("exchange_plus_cash")) {
-        if (!data.price || data.price <= 0) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el valor total estimado del producto/servicio" });
-        }
-        
         // At least one wanted field required for Permuta
         if (!data.wantedProducts?.trim() && !data.wantedServices?.trim()) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["wantedProducts"], message: "Debes especificar qué artículo o servicio buscas recibir" });
@@ -188,6 +182,23 @@ export default function NewProductPage() {
   const communityIds = watch("communityIds") || [];
   const categoryId = watch("categoryId");
   const trendTags = watch("trendTags") || [];
+  const hasMoneySelected = acceptedExchangeTypes?.includes("money") ?? false;
+  const isPermutaSelected =
+    acceptedExchangeTypes?.includes("exchange_plus_cash") ?? false;
+  const isGiveawaySelected =
+    acceptedExchangeTypes?.includes("giveaway") ?? false;
+  const priceLabel = hasMoneySelected && !isPermutaSelected
+    ? "Precio de venta (S/.)"
+    : isPermutaSelected
+    ? "Precio referencial total (S/.)"
+    : "Valor referencial (S/.)";
+  const priceHelper = isPermutaSelected
+    ? "Precio referencial total: el valor estimado de tu producto/servicio. La oferta del interesado (producto/servicio) + el monto que pague debe acercarse a este valor."
+    : hasMoneySelected
+    ? "Es el monto que esperas recibir como pago."
+    : isGiveawaySelected
+    ? "Es un valor referencial para tu regalo; sirve solo como referencia."
+    : "Es un valor referencial para orientar el intercambio.";
   const trendOptions = useMemo(() => getActiveTrends(), []);
 
   const focusFirstError = (fieldOrder: (keyof ProductForm)[]) => {
@@ -445,9 +456,7 @@ export default function NewProductPage() {
         // - Money: price
         // - Permuta: price (total value)
         // - Others: null or 0
-        price: (data.acceptedExchangeTypes.includes("money") || data.acceptedExchangeTypes.includes("exchange_plus_cash")) 
-                ? data.price 
-                : 0, 
+        price: data.price,
         categoryId: data.categoryId,
         condition: data.listingType === "product" ? (data.condition ?? "used") : "new", 
         location: data.location.trim(),
@@ -661,33 +670,29 @@ export default function NewProductPage() {
 
             {/* CAMPOS DINÁMICOS SEGÚN SELECCIÓN */}
             <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                
-                {/* 1. DINERO o PERMUTA -> Pide Valor Total */}
-                {(acceptedExchangeTypes?.includes("money") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (
+
+                {/* Valor referencial / precio */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Valor Referencial del {listingType === 'product' ? 'artículo' : 'servicio'} (S/.)
-                    </label>
-                    <input
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {priceLabel}
+                  </label>
+                  <input
                     type="number"
                     step="0.01"
                     {...register("price", { valueAsNumber: true })}
                     placeholder="0.00"
                     data-field="price"
                     className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-                    />
-                    {acceptedExchangeTypes?.includes("exchange_plus_cash") && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        Precio referencial total: el valor estimado de tu producto/servicio. La oferta del interesado (producto/servicio) + el monto que pague debe acercarse a este valor.
-                    </p>
-                    )}
-                    {errors.price && (
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    {priceHelper}
+                  </p>
+                  {errors.price && (
                     <p className="mt-1 text-xs text-red-500 dark:text-red-400">
-                        {errors.price.message}
+                      {errors.price.message}
                     </p>
-                    )}
+                  )}
                 </div>
-                )}
 
                 {/* 3. TRUEQUE DE PRODUCTOS */}
                 {(acceptedExchangeTypes?.includes("product") || acceptedExchangeTypes?.includes("exchange_plus_cash")) && (

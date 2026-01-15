@@ -30,11 +30,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const status = (error as HttpError).status || 500;
     const message = (error as Error).message || "Internal Server Error";
-    
+
     console.error("Error creating order:", error);
-    return NextResponse.json(
-      { error: message },
-      { status: status }
-    );
+    return NextResponse.json({ error: message }, { status });
   }
 }

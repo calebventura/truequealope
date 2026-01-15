@@ -22,6 +22,7 @@ import { Order } from "@/types/order";
 import { Button } from "@/components/ui/Button";
 import { getContactClicksCount, logContactClick } from "@/lib/contact";
 import { CATEGORIES } from "@/lib/constants";
+import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
 
 type ActivityTab = "seller" | "buyer";
@@ -133,7 +134,14 @@ function SellerActivity({ userId }: { userId: string }) {
     try {
       setOrderActionLoading(true);
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) {
+        showAlert("Inicia sesión nuevamente para continuar.", { tone: "error", title: "Sesión expirada" });
+        return;
+      }
+      if (!orderId) {
+        showAlert("Orden inválida", { tone: "error", title: "No se pudo procesar" });
+        return;
+      }
       const token = await user.getIdToken();
 
       const res = await fetch(`/api/orders/${orderId}/${action}`, {
@@ -143,13 +151,26 @@ function SellerActivity({ userId }: { userId: string }) {
         }
       });
 
-      if (!res.ok) throw new Error("Failed to process order");
+      if (!res.ok) {
+        let reason = "Failed to process order";
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (data?.error) reason = data.error;
+          console.error(`processOrderAction ${action} failed`, { orderId, status: res.status, reason, response: data });
+        } catch {
+          // ignore
+        }
+        throw new Error(reason);
+      }
 
       setPendingOrders(prev => prev.filter(o => o.id !== orderId));
       window.location.reload();
     } catch (e) {
       console.error(e);
-      showAlert("Error al procesar la solicitud", { tone: "error", title: "No se pudo procesar" });
+      showAlert(
+        (e as Error).message || "Error al procesar la solicitud",
+        { tone: "error", title: "No se pudo procesar" }
+      );
     } finally {
       setOrderActionLoading(false);
     }
@@ -702,11 +723,25 @@ function SellerActivity({ userId }: { userId: string }) {
                       {product.title}
                     </Link>
                   </h3>
-                  <p className="text-indigo-600 dark:text-indigo-400 font-bold">
-                    {product.price != null
-                      ? `S/. ${product.price.toLocaleString()}`
-                      : "Sin precio"}
-                  </p>
+                  {(() => {
+                    const accepted = getAcceptedExchangeTypes(product);
+                    const showsMoney =
+                      accepted.includes("money") || accepted.includes("exchange_plus_cash");
+                    if (product.price != null) {
+                      return (
+                        <p className="text-indigo-600 dark:text-indigo-400 font-bold">
+                          {showsMoney
+                            ? `S/. ${product.price.toLocaleString()}`
+                            : `Valor referencial: S/. ${product.price.toLocaleString()}`}
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="text-indigo-600 dark:text-indigo-400 font-bold">
+                        Sin precio
+                      </p>
+                    );
+                  })()}
                   <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
                     {product.createdAt.toLocaleDateString()}
                   </p>
