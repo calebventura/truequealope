@@ -50,7 +50,9 @@ const productSchema = z
 
     categoryId: z.string().min(1, "Selecciona una categoría"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
-    location: z.string().min(3, "Selecciona departamento, provincia y distrito"),
+    location: z
+      .string({ required_error: "Selecciona departamento, provincia y distrito" })
+      .min(3, "Selecciona departamento, provincia y distrito"),
     trendTags: z.array(z.string()).optional(),
     images: z.any().optional(),
   })
@@ -167,7 +169,7 @@ export default function NewProductPage() {
     watch,
     reset,
     setValue,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, submitCount },
   } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -177,6 +179,7 @@ export default function NewProductPage() {
       communityIds: [],
       otherCategoryLabel: "",
       trendTags: [],
+      location: "",
     },
   });
 
@@ -206,10 +209,10 @@ export default function NewProductPage() {
       setValue(
         "location",
         buildLocationLabel(district, province, department),
-        { shouldValidate: true }
+        { shouldValidate: submitCount > 0 }
       );
     } else {
-      setValue("location", "", { shouldValidate: true });
+      setValue("location", "", { shouldValidate: submitCount > 0 });
     }
   };
 
@@ -879,7 +882,7 @@ export default function NewProductPage() {
                 </select>
               </div>
             </div>
-            {errors.location && (
+            {submitCount > 0 && errors.location && (
               <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                 {errors.location.message}
               </p>
