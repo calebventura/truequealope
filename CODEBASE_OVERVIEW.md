@@ -18,7 +18,7 @@ Truequealo.pe es una aplicación web construida con Next.js y Firebase, diseñad
   - **Almacenamiento:** [Firebase Storage](https://firebase.google.com/docs/storage)
 - **Validación de Formularios:** [React Hook Form](https://react-hook-form.com/) con [Zod](https://zod.dev/)
 - **Linting:** [ESLint](https://eslint.org/)
-- **Estados de orden:** creación de orden marca producto como `reserved` y guarda comprador (`reservedForUserId`/`reservedForContact`); al confirmar se fijan `finalBuyerUserId`/`finalBuyerContact` y `finalDealPrice` para mostrarlos en actividad y detalle.
+- **Estados de orden:** creación de orden marca producto como `reserved` y guarda comprador (`reservedForUserId`/`reservedForContact`); al confirmar se fijan `finalBuyerUserId`/`finalBuyerContact` y `finalDealPrice` para mostrarlos en actividad y detalle. Publicaciones pueden aceptar venta y trueque simultáneamente (money + product/service) usando un solo `price` como valor de referencia/venta.
 
 ## 3. Estructura de Archivos Principal
 

@@ -303,9 +303,9 @@ export default function ProductDetailPage() {
 
     setBuying(true);
     try {
-      const orderId = await createOrder(product.id!);
+      const order = await createOrder(product.id!);
       setPurchaseLocked(true);
-      showAlert(`Orden creada con éxito. ID: ${orderId.orderId}`, {
+      showAlert(`Orden creada con éxito. ID: ${order.orderId}`, {
         tone: "success",
         title: "Orden creada",
       });
@@ -880,9 +880,16 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                 ) : acceptsMoney && referentialPrice !== null ? (
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-                    {`S/. ${referentialPrice.toLocaleString()}`}
-                  </p>
+                  <div className="flex flex-col gap-1 mb-2">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {`S/. ${referentialPrice.toLocaleString()}`}
+                    </p>
+                    {acceptsTrade && !isPermuta && (
+                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                        Acepta trueque al valor referencial
+                      </p>
+                    )}
+                  </div>
                 ) : referentialPrice !== null ? (
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Valor referencial: S/. {referentialPrice.toLocaleString()}

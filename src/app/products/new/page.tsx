@@ -40,12 +40,7 @@ const productSchema = z
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1, "Selecciona una opción de intercambio"),
     communityIds: z.array(z.string()).optional(),
 
-    price: z
-      .number({
-        required_error: "Ingresa el valor referencial",
-        invalid_type_error: "Ingresa el valor referencial",
-      })
-      .gt(0, "Ingresa un valor mayor a 0"),
+    price: z.number().gt(0, "Ingresa un valor mayor a 0"),
     
     // Separate fields for specific exchange wants
     wantedProducts: z.string().optional(),
@@ -55,9 +50,7 @@ const productSchema = z
 
     categoryId: z.string().min(1, "Selecciona una categoría"),
     condition: z.enum(["new", "like-new", "used"]).optional(),
-    location: z
-      .string({ required_error: "Selecciona departamento, provincia y distrito" })
-      .min(3, "Selecciona departamento, provincia y distrito"),
+    location: z.string().min(3, "Selecciona departamento, provincia y distrito"),
     trendTags: z.array(z.string()).optional(),
     images: z.any().optional(),
   })
@@ -341,14 +334,11 @@ export default function NewProductPage() {
         current.clear(); // Regalo borra todo lo demás
       } else if (type === 'exchange_plus_cash') {
         current.clear(); // Permuta borra todo lo demás
-      } else if (type === 'money') {
-        current.clear(); // Dinero borra todo lo demás
       } else {
-        // Si selecciona Producto o Servicio (Trueque puro)
-        // Borramos los exclusivos
+        // Limpiar exclusivos si estamos marcando cualquier opción que no sea regalo/permuta
         if (current.has('giveaway')) current.delete('giveaway');
         if (current.has('exchange_plus_cash')) current.delete('exchange_plus_cash');
-        if (current.has('money')) current.delete('money');
+        // Dinero ahora puede convivir con trueque; no lo borramos si ya estaba.
       }
       current.add(type);
     } else {

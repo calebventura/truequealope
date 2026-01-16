@@ -9,10 +9,7 @@ const productSchema = z
     listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1),
     exchangeCashDelta: z.number().optional(),
-    price: z.number({
-      required_error: "Ingresa el valor referencial",
-      invalid_type_error: "Ingresa el valor referencial",
-    }).gt(0, "Ingresa un valor mayor a 0"),
+    price: z.number().gt(0, "Ingresa un valor mayor a 0"),
     wantedProducts: z.string().optional(),
     wantedServices: z.string().optional(),
     // ... other fields are less relevant for this specific logic test
@@ -151,6 +148,28 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
                 wantedProducts: "Laptop",
                 wantedServices: "Cleaning",
                 price: 200,
+            };
+            const result = productSchema.safeParse(input);
+            expect(result.success).toBe(true);
+        });
+    });
+
+    describe('Scenario 4b: Money + Product (Venta y Trueque)', () => {
+        it('should require wantedProducts when money + product are selected', () => {
+            const input = { ...baseInput, acceptedExchangeTypes: ["money", "product"], price: 300 };
+            const result = productSchema.safeParse(input);
+            expect(result.success).toBe(false);
+            if (!result.success) {
+                expect(result.error.issues.some(i => i.path.includes("wantedProducts"))).toBe(true);
+            }
+        });
+
+        it('should pass with price and wantedProducts', () => {
+            const input = {
+                ...baseInput,
+                acceptedExchangeTypes: ["money", "product"],
+                price: 300,
+                wantedProducts: "Tablet, TV"
             };
             const result = productSchema.safeParse(input);
             expect(result.success).toBe(true);

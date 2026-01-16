@@ -1,6 +1,8 @@
 import { auth } from '@/lib/firebaseClient';
 
-export async function createOrder(productId: string) {
+export type CreateOrderResponse = { orderId: string; status?: string };
+
+export async function createOrder(productId: string): Promise<CreateOrderResponse> {
   const user = auth.currentUser;
   if (!user) throw new Error("User not authenticated");
 
@@ -35,5 +37,5 @@ export async function createOrder(productId: string) {
     throw new Error(message);
   }
 
-  return (payload ?? rawText) as unknown;
+  return (payload ?? rawText) as CreateOrderResponse;
 }
