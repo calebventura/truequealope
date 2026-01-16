@@ -67,7 +67,17 @@ export class OrderService {
         throw new HttpError("Product is not active", 400);
       }
 
-      // ... (rest of validation logic like seller != buyer, etc.)
+      // Obtener datos del comprador (perfil) para guardar correo en el producto
+      let buyerEmail: string | null = null;
+      try {
+        const buyerSnap = await tx.get(adminDb.collection('users').doc(buyerId));
+        if (buyerSnap.exists) {
+          const data = buyerSnap.data() as { email?: string | null };
+          buyerEmail = data?.email ?? null;
+        }
+      } catch (err) {
+        console.error("No se pudo leer el perfil del comprador", err);
+      }
 
       const orderRef = ordersRef.doc();
       const orderData = {
@@ -84,7 +94,9 @@ export class OrderService {
       tx.set(orderRef, orderData);
       tx.update(productRef, { 
           status: 'reserved',
-          reservedAt: admin.firestore.FieldValue.serverTimestamp() // Rule 3 support
+          reservedAt: admin.firestore.FieldValue.serverTimestamp(), // Rule 3 support
+          reservedForUserId: buyerId,
+          reservedForContact: buyerEmail,
       });
 
       return { orderId: orderRef.id, status: 'pending' };
@@ -118,12 +130,36 @@ export class OrderService {
       const productRef = adminDb.collection('products').doc(productId);
       const productSnap = await tx.get(productRef);
       if (!productSnap.exists) throw new HttpError("Product not found", 404);
+      const productData = productSnap.data() as Product;
+
+      const buyerId = orderData?.buyerId as string | undefined;
+      if (!buyerId) throw new HttpError("Order has no buyerId", 400);
+
+      let buyerEmail: string | null =
+        (productData.reservedForContact as string | null | undefined) ?? null;
+      if (!buyerEmail) {
+        try {
+          const buyerSnap = await tx.get(adminDb.collection('users').doc(buyerId));
+          if (buyerSnap.exists) {
+            const data = buyerSnap.data() as { email?: string | null };
+            buyerEmail = data?.email ?? null;
+          }
+        } catch (err) {
+          console.error("No se pudo leer el perfil del comprador al confirmar", { buyerId, err });
+        }
+      }
 
       // Rule 1: Confirm -> SOLD
       tx.update(orderRef, { status: 'completed' });
       tx.update(productRef, {
         status: 'sold',
-        soldAt: admin.firestore.FieldValue.serverTimestamp() // Rule 2 support
+        soldAt: admin.firestore.FieldValue.serverTimestamp(), // Rule 2 support
+        finalBuyerUserId: buyerId,
+        finalBuyerContact: buyerEmail ?? productData.finalBuyerContact ?? null,
+        finalDealPrice: productData.price ?? orderData?.price ?? null,
+        finalizedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reservedForUserId: buyerId,
+        reservedForContact: buyerEmail ?? productData.reservedForContact ?? null,
       });
     });
   }

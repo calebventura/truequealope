@@ -123,6 +123,7 @@ export default function NewProductPage() {
   const [uploading, setUploading] = useState(false);
   const [generalError, setGeneralError] = useState("");
   const [draftRestored, setDraftRestored] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [alertModal, setAlertModal] = useState<{
     title: string;
     description: string;
@@ -220,10 +221,10 @@ export default function NewProductPage() {
       setValue(
         "location",
         buildLocationLabel(district, province, department),
-        { shouldValidate: submitCount > 0 }
+        { shouldValidate: attemptedSubmit }
       );
     } else {
-      setValue("location", "", { shouldValidate: submitCount > 0 });
+      setValue("location", "", { shouldValidate: attemptedSubmit });
     }
   };
 
@@ -314,8 +315,8 @@ export default function NewProductPage() {
       const step2Fields: (keyof ProductForm)[] = [
         "acceptedExchangeTypes",
         "price",
-        "wantedProducts",
-        "wantedServices",
+      "wantedProducts",
+      "wantedServices",
         "otherCategoryLabel",
         "categoryId",
         "condition",
@@ -533,7 +534,10 @@ export default function NewProductPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit, () => setAttemptedSubmit(true))}
+        className="space-y-6"
+      >
         {step === 1 && (
           <>
             {/* Tipo de Publicación */}
@@ -887,7 +891,7 @@ export default function NewProductPage() {
                 </select>
               </div>
             </div>
-            {submitCount > 0 && errors.location && (
+            {attemptedSubmit && errors.location && (
               <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                 {errors.location.message}
               </p>
