@@ -22,6 +22,7 @@ import { Order } from "@/types/order";
 import { Button } from "@/components/ui/Button";
 import { getContactClicksCount, logContactClick } from "@/lib/contact";
 import { CATEGORIES } from "@/lib/constants";
+import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
 
 type ActivityTab = "seller" | "buyer";
@@ -61,6 +62,12 @@ function SellerActivity({ userId }: { userId: string }) {
   const [reservedAssignments, setReservedAssignments] = useState<
     Record<string, { email: string; userId: string; name?: string | null }>
   >({});
+  const [buyerProfiles, setBuyerProfiles] = useState<
+    Record<string, { displayName: string | null; email: string | null }>
+  >({});
+  const [buyerProfilesForOrders, setBuyerProfilesForOrders] = useState<
+    Record<string, { displayName: string | null; email: string | null }>
+  >({});
   const [dealModal, setDealModal] = useState<{
     productId: string;
     type: "sale" | "donation" | "trade" | "permuta";
@@ -84,6 +91,11 @@ function SellerActivity({ userId }: { userId: string }) {
     orderId: string;
     productTitle: string;
     price: number;
+  } | null>(null);
+  const [pendingActionModal, setPendingActionModal] = useState<{
+    orderId: string;
+    action: "confirm" | "reject";
+    productTitle: string;
   } | null>(null);
   const [orderActionLoading, setOrderActionLoading] = useState(false);
 
@@ -129,11 +141,118 @@ function SellerActivity({ userId }: { userId: string }) {
     fetchPendingOrders();
   }, [userId]);
 
+  useEffect(() => {
+    const loadPendingOrderBuyers = async () => {
+      const toFetch = pendingOrders
+        .map((o) => o.buyerId)
+        .filter((id) => id && !buyerProfilesForOrders[id]);
+
+      for (const uid of toFetch) {
+        try {
+          const snap = await getDoc(doc(db, "users", uid));
+          const data = snap.exists()
+            ? (snap.data() as { displayName?: string | null; email?: string | null })
+            : null;
+          setBuyerProfilesForOrders((prev) => ({
+            ...prev,
+            [uid]: {
+              displayName: data?.displayName ?? null,
+              email: data?.email ?? null,
+            },
+          }));
+        } catch (error) {
+          console.error("Error fetching pending order buyer profile", { uid, error });
+          setBuyerProfilesForOrders((prev) => ({
+            ...prev,
+            [uid]: { displayName: null, email: null },
+          }));
+        }
+      }
+    };
+    void loadPendingOrderBuyers();
+  }, [pendingOrders, buyerProfilesForOrders]);
+
+  useEffect(() => {
+    const loadBuyerProfiles = async () => {
+      const ids = new Set<string>();
+      products.forEach((p) => {
+        if (p.finalBuyerUserId) ids.add(p.finalBuyerUserId);
+        else if (p.reservedForUserId) ids.add(p.reservedForUserId);
+      });
+      const toFetch = Array.from(ids).filter((id) => !buyerProfiles[id]);
+      for (const uid of toFetch) {
+        try {
+          const snap = await getDoc(doc(db, "users", uid));
+          const data = snap.exists()
+            ? (snap.data() as { displayName?: string | null; email?: string | null })
+            : null;
+          setBuyerProfiles((prev) => ({
+            ...prev,
+            [uid]: {
+              displayName: data?.displayName ?? null,
+              email: data?.email ?? null,
+            },
+          }));
+        } catch (error) {
+          console.error("Error fetching buyer profile", { uid, error });
+          setBuyerProfiles((prev) => ({
+            ...prev,
+            [uid]: { displayName: null, email: null },
+          }));
+        }
+      }
+    };
+    void loadBuyerProfiles();
+  }, [products, buyerProfiles]);
+
+  useEffect(() => {
+    const loadBuyers = async () => {
+      const toFetch = Array.from(
+        new Set(
+          products
+            .filter(
+              (p) => p.status === "sold" && p.finalBuyerUserId && !buyerProfiles[p.finalBuyerUserId]
+            )
+            .map((p) => p.finalBuyerUserId as string)
+        )
+      );
+      for (const uid of toFetch) {
+        try {
+          const snap = await getDoc(doc(db, "users", uid));
+          const data = snap.exists()
+            ? (snap.data() as { displayName?: string | null; email?: string | null })
+            : null;
+          setBuyerProfiles((prev) => ({
+            ...prev,
+            [uid]: {
+              displayName: data?.displayName ?? null,
+              email: data?.email ?? null,
+            },
+          }));
+        } catch (error) {
+          console.error("Error fetching buyer profile", { uid, error });
+          setBuyerProfiles((prev) => ({
+            ...prev,
+            [uid]: { displayName: null, email: null },
+          }));
+        }
+      }
+    };
+    void loadBuyers();
+  }, [products, buyerProfiles]);
+
   const processOrderAction = async (orderId: string, action: 'confirm' | 'reject') => {
     try {
       setOrderActionLoading(true);
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) {
+        showAlert("Inicia sesión nuevamente para continuar.", { tone: "error", title: "Sesión expirada" });
+        return;
+      }
+      if (!orderId) {
+        showAlert("Orden inválida", { tone: "error", title: "No se pudo procesar" });
+        return;
+      }
       const token = await user.getIdToken();
 
       const res = await fetch(`/api/orders/${orderId}/${action}`, {
@@ -143,13 +262,26 @@ function SellerActivity({ userId }: { userId: string }) {
         }
       });
 
-      if (!res.ok) throw new Error("Failed to process order");
+      if (!res.ok) {
+        let reason = "Failed to process order";
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (data?.error) reason = data.error;
+          console.error(`processOrderAction ${action} failed`, { orderId, status: res.status, reason, response: data });
+        } catch {
+          // ignore
+        }
+        throw new Error(reason);
+      }
 
       setPendingOrders(prev => prev.filter(o => o.id !== orderId));
       window.location.reload();
     } catch (e) {
       console.error(e);
-      showAlert("Error al procesar la solicitud", { tone: "error", title: "No se pudo procesar" });
+      showAlert(
+        (e as Error).message || "Error al procesar la solicitud",
+        { tone: "error", title: "No se pudo procesar" }
+      );
     } finally {
       setOrderActionLoading(false);
     }
@@ -405,6 +537,20 @@ function SellerActivity({ userId }: { userId: string }) {
     return "VENDIDO";
   };
 
+  const getBuyerLabel = (product: Product) => {
+    const userId = product.finalBuyerUserId ?? product.reservedForUserId ?? null;
+    const contact = product.finalBuyerContact ?? product.reservedForContact ?? null;
+    const profile = userId ? buyerProfiles[userId] : null;
+
+    if (profile?.displayName && profile?.email) {
+      return `${profile.displayName} (${profile.email})`;
+    }
+    if (profile?.displayName) return profile.displayName;
+    if (profile?.email) return profile.email;
+    if (contact) return contact;
+    return "No registrado";
+  };
+
   const getActionLabel = (product: Product) => {
     const type = getDealType(product);
     if (type === "donation") return "Donar";
@@ -550,23 +696,33 @@ function SellerActivity({ userId }: { userId: string }) {
             Solicitudes Pendientes
           </h3>
           <div className="space-y-4">
-            {pendingOrders.map((order) => (
-              <div key={order.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-yellow-100 dark:border-yellow-900/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
-                 <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{order.productTitle}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Comprador ID: {order.buyerId.slice(0, 8)}...</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{order.createdAt.toLocaleString()}</p>
-                    <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                      S/. {typeof order.price === "number" ? order.price.toLocaleString() : "0"}
-                    </p>
-                 </div>
+                {pendingOrders.map((order) => (
+                  <div key={order.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-yellow-100 dark:border-yellow-900/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
+                     <div>
+                       <p className="font-semibold text-gray-900 dark:text-white">{order.productTitle}</p>
+                     <p className="text-sm text-gray-600 dark:text-gray-400">
+                       {(() => {
+                         const buyer = buyerProfilesForOrders[order.buyerId];
+                         if (buyer?.displayName && buyer?.email) {
+                           return `Comprador: ${buyer.displayName} (${buyer.email})`;
+                         }
+                         if (buyer?.displayName) return `Comprador: ${buyer.displayName}`;
+                         if (buyer?.email) return `Comprador: ${buyer.email}`;
+                         return `Comprador ID: ${order.buyerId.slice(0, 8)}...`;
+                       })()}
+                     </p>
+                     <p className="text-sm text-gray-500 dark:text-gray-400">{order.createdAt.toLocaleString()}</p>
+                     <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                       S/. {typeof order.price === "number" ? order.price.toLocaleString() : "0"}
+                     </p>
+                  </div>
                  <div className="flex gap-2 w-full md:w-auto">
                     <Button
                       onClick={() =>
-                        setConfirmOrderModal({
+                        setPendingActionModal({
                           orderId: order.id,
+                          action: "confirm",
                           productTitle: order.productTitle,
-                          price: order.price,
                         })
                       }
                       className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500 flex-1 md:flex-none"
@@ -574,7 +730,13 @@ function SellerActivity({ userId }: { userId: string }) {
                         Confirmar Venta
                     </Button>
                     <Button
-                      onClick={() => processOrderAction(order.id, 'reject')}
+                      onClick={() =>
+                        setPendingActionModal({
+                          orderId: order.id,
+                          action: "reject",
+                          productTitle: order.productTitle,
+                        })
+                      }
                       variant="outline"
                       className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-900/20 flex-1 md:flex-none"
                     >
@@ -702,11 +864,25 @@ function SellerActivity({ userId }: { userId: string }) {
                       {product.title}
                     </Link>
                   </h3>
-                  <p className="text-indigo-600 dark:text-indigo-400 font-bold">
-                    {product.price != null
-                      ? `S/. ${product.price.toLocaleString()}`
-                      : "Sin precio"}
-                  </p>
+                  {(() => {
+                    const accepted = getAcceptedExchangeTypes(product);
+                    const showsMoney =
+                      accepted.includes("money") || accepted.includes("exchange_plus_cash");
+                    if (product.price != null) {
+                      return (
+                        <p className="text-indigo-600 dark:text-indigo-400 font-bold">
+                          {showsMoney
+                            ? `S/. ${product.price.toLocaleString()}`
+                            : `Valor referencial: S/. ${product.price.toLocaleString()}`}
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="text-indigo-600 dark:text-indigo-400 font-bold">
+                        Sin precio
+                      </p>
+                    );
+                  })()}
                   <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
                     {product.createdAt.toLocaleDateString()}
                   </p>
@@ -870,9 +1046,7 @@ function SellerActivity({ userId }: { userId: string }) {
                     </div>
                     <div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">Usuario</span>
-                      <p className="font-medium">
-                        {product.finalBuyerContact || product.reservedForContact || "No registrado"}
-                      </p>
+                      <p className="font-medium">{getBuyerLabel(product)}</p>
                     </div>
                     {product.finalDealPrice != null && (
                       <div>
@@ -1100,6 +1274,50 @@ function SellerActivity({ userId }: { userId: string }) {
               className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500"
             >
               {orderActionLoading ? "Procesando..." : "Confirmar"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    {pendingActionModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              pendingActionModal.action === "confirm"
+                ? "bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100"
+                : "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100"
+            }`}>
+              {pendingActionModal.action === "confirm" ? "Confirmar venta" : "Rechazar solicitud"}
+            </span>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {pendingActionModal.productTitle}
+            </h3>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-200">
+            {pendingActionModal.action === "confirm"
+              ? "¿Deseas confirmar esta venta?"
+              : "¿Deseas rechazar esta solicitud de compra?"}
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setPendingActionModal(null)}
+              disabled={orderActionLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                void processOrderAction(pendingActionModal.orderId, pendingActionModal.action);
+                setPendingActionModal(null);
+              }}
+              disabled={orderActionLoading}
+              className={pendingActionModal.action === "confirm"
+                ? "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500"
+                : "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"}
+            >
+              {orderActionLoading ? "Procesando..." : "Sí, continuar"}
             </Button>
           </div>
         </div>

@@ -9,7 +9,7 @@ const productSchema = z
     listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1),
     exchangeCashDelta: z.number().optional(),
-    price: z.number().optional(),
+    price: z.number().gt(0, "Ingresa un valor mayor a 0"),
     wantedProducts: z.string().optional(),
     wantedServices: z.string().optional(),
     // ... other fields are less relevant for this specific logic test
@@ -17,11 +17,9 @@ const productSchema = z
   .superRefine((data, ctx) => {
     const types = data.acceptedExchangeTypes || [];
     
-    // 1. Dinero (Solo Venta)
-    if (types.includes("money")) {
-        if (data.price === undefined || data.price === null || data.price <= 0) {
-             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el precio de venta" });
-        }
+    // Precio referencial es obligatorio en todos los casos
+    if (data.price === undefined || data.price === null || data.price <= 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el valor referencial" });
     }
 
     // 2. Permuta (Mix)
@@ -77,12 +75,13 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
     });
 
     describe('Scenario 2: Product Exchange (Trueque)', () => {
-        it('should require wantedProducts description', () => {
+        it('should require wantedProducts description and price', () => {
             const input = { ...baseInput, acceptedExchangeTypes: ["product"] };
             const result = productSchema.safeParse(input);
             expect(result.success).toBe(false);
             if (!result.success) {
                 expect(result.error.issues.some(i => i.path.includes("wantedProducts"))).toBe(true);
+                expect(result.error.issues.some(i => i.path.includes("price"))).toBe(true);
             }
         });
 
@@ -90,7 +89,8 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
             const input = {
                 ...baseInput,
                 acceptedExchangeTypes: ["product"],
-                wantedProducts: "I want an iPhone"
+                wantedProducts: "I want an iPhone",
+                price: 120,
             };
             const result = productSchema.safeParse(input);
             expect(result.success).toBe(true);
@@ -98,13 +98,20 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
     });
 
     describe('Scenario 3: Service Exchange', () => {
-        it('should require wantedServices description', () => {
+        it('should require wantedServices description and price', () => {
             const input = { ...baseInput, acceptedExchangeTypes: ["service"] };
             const result = productSchema.safeParse(input);
             expect(result.success).toBe(false);
             if (!result.success) {
                 expect(result.error.issues.some(i => i.path.includes("wantedServices"))).toBe(true);
+                expect(result.error.issues.some(i => i.path.includes("price"))).toBe(true);
             }
+        });
+
+        it('should pass when service description and price are provided', () => {
+            const input = { ...baseInput, acceptedExchangeTypes: ["service"], wantedServices: "Clase de piano", price: 80 };
+            const result = productSchema.safeParse(input);
+            expect(result.success).toBe(true);
         });
     });
 
@@ -116,6 +123,7 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
             if (!result.success) {
                 expect(result.error.issues.some(i => i.path.includes("wantedProducts"))).toBe(true);
                 expect(result.error.issues.some(i => i.path.includes("wantedServices"))).toBe(true);
+                expect(result.error.issues.some(i => i.path.includes("price"))).toBe(true);
             }
         });
 
@@ -123,7 +131,8 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
             const input = {
                 ...baseInput,
                 acceptedExchangeTypes: ["product", "service"],
-                wantedProducts: "Laptop"
+                wantedProducts: "Laptop",
+                price: 200,
             };
             const result = productSchema.safeParse(input);
             expect(result.success).toBe(false);
@@ -137,7 +146,30 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
                 ...baseInput,
                 acceptedExchangeTypes: ["product", "service"],
                 wantedProducts: "Laptop",
-                wantedServices: "Cleaning"
+                wantedServices: "Cleaning",
+                price: 200,
+            };
+            const result = productSchema.safeParse(input);
+            expect(result.success).toBe(true);
+        });
+    });
+
+    describe('Scenario 4b: Money + Product (Venta y Trueque)', () => {
+        it('should require wantedProducts when money + product are selected', () => {
+            const input = { ...baseInput, acceptedExchangeTypes: ["money", "product"], price: 300 };
+            const result = productSchema.safeParse(input);
+            expect(result.success).toBe(false);
+            if (!result.success) {
+                expect(result.error.issues.some(i => i.path.includes("wantedProducts"))).toBe(true);
+            }
+        });
+
+        it('should pass with price and wantedProducts', () => {
+            const input = {
+                ...baseInput,
+                acceptedExchangeTypes: ["money", "product"],
+                price: 300,
+                wantedProducts: "Tablet, TV"
             };
             const result = productSchema.safeParse(input);
             expect(result.success).toBe(true);
@@ -180,10 +212,16 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
     });
 
     describe('Scenario 6: Giveaway', () => {
-        it('should pass without price or wanted items', () => {
+        it('should require referential price even if it is a giveaway', () => {
             const input = { ...baseInput, acceptedExchangeTypes: ["giveaway"] };
             const result = productSchema.safeParse(input);
-            expect(result.success).toBe(true);
+            expect(result.success).toBe(false);
+            if (!result.success) {
+                expect(result.error.issues.some(i => i.path.includes("price"))).toBe(true);
+            }
+
+            const withPrice = { ...input, price: 50 };
+            expect(productSchema.safeParse(withPrice).success).toBe(true);
         });
     });
 

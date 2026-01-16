@@ -1,7 +1,14 @@
-
 import { adminDb } from '@/lib/firebaseAdmin';
 import { Product, TimestampLike } from '@/types/product';
 import * as admin from 'firebase-admin';
+
+class HttpError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const resolveTimestamp = (value: TimestampLike | null | undefined) => {
   if (!value) return undefined;
@@ -21,17 +28,28 @@ const resolveTimestamp = (value: TimestampLike | null | undefined) => {
 
 export class OrderService {
   static async createOrder(buyerId: string, productId: string) {
+    if (!productId) {
+      throw new HttpError("Missing productId", 400);
+    }
+
     const productRef = adminDb.collection('products').doc(productId);
     const ordersRef = adminDb.collection('orders');
 
     return await adminDb.runTransaction(async (tx) => {
       const productSnap = await tx.get(productRef);
-      if (!productSnap.exists) throw new Error("Product not found");
+      if (!productSnap.exists) throw new HttpError("Product not found", 404);
 
       const productData = productSnap.data() as Product;
+      if (productData.sellerId === buyerId) {
+        throw new HttpError("No puedes comprar tu propio producto", 400);
+      }
       
       const RESERVATION_TIME_MINUTES = parseInt(process.env.NEXT_PUBLIC_RESERVATION_TIME_MINUTES || '120');
       
+      if (productData.status === 'sold') {
+        throw new HttpError("Product is already sold", 400);
+      }
+
       if (productData.status === 'reserved') {
           // Lazy Validation: Check expiration
           const reservedAt = resolveTimestamp(productData.reservedAt);
@@ -41,15 +59,25 @@ export class OrderService {
               const expirationTime = new Date(reservedAt.getTime() + RESERVATION_TIME_MINUTES * 60000);
               
               if (now <= expirationTime) {
-                  throw new Error("Product is currently reserved");
+                  throw new HttpError("Product is currently reserved", 400);
               }
               // If expired, allow overwriting (proceeds to logic below)
           }
       } else if (productData.status !== 'active') {
-        throw new Error("Product is not active");
+        throw new HttpError("Product is not active", 400);
       }
 
-      // ... (rest of validation logic like seller != buyer, etc.)
+      // Obtener datos del comprador (perfil) para guardar correo en el producto
+      let buyerEmail: string | null = null;
+      try {
+        const buyerSnap = await tx.get(adminDb.collection('users').doc(buyerId));
+        if (buyerSnap.exists) {
+          const data = buyerSnap.data() as { email?: string | null };
+          buyerEmail = data?.email ?? null;
+        }
+      } catch (err) {
+        console.error("No se pudo leer el perfil del comprador", err);
+      }
 
       const orderRef = ordersRef.doc();
       const orderData = {
@@ -66,7 +94,9 @@ export class OrderService {
       tx.set(orderRef, orderData);
       tx.update(productRef, { 
           status: 'reserved',
-          reservedAt: admin.firestore.FieldValue.serverTimestamp() // Rule 3 support
+          reservedAt: admin.firestore.FieldValue.serverTimestamp(), // Rule 3 support
+          reservedForUserId: buyerId,
+          reservedForContact: buyerEmail,
       });
 
       return { orderId: orderRef.id, status: 'pending' };
@@ -74,47 +104,93 @@ export class OrderService {
   }
 
   static async confirmOrder(sellerId: string, orderId: string) {
-      // Implement Rule 1 part 2
-      const orderRef = adminDb.collection('orders').doc(orderId);
-      
-      return await adminDb.runTransaction(async (tx) => {
-          const orderSnap = await tx.get(orderRef);
-          if (!orderSnap.exists) throw new Error("Order not found");
-          
-          const orderData = orderSnap.data();
-          if (orderData?.sellerId !== sellerId) throw new Error("Unauthorized");
-          if (orderData?.status !== 'pending') throw new Error("Order not pending");
+    if (!orderId) {
+      throw new HttpError("Missing orderId", 400);
+    }
+    // Implement Rule 1 part 2
+    const orderRef = adminDb.collection('orders').doc(orderId);
 
-          const productRef = adminDb.collection('products').doc(orderData.productId);
-          const productSnap = await tx.get(productRef);
-          if (!productSnap.exists) throw new Error("Product not found");
-          
-          // Rule 1: Confirm -> SOLD
-          tx.update(orderRef, { status: 'completed' });
-          tx.update(productRef, { 
-              status: 'sold',
-              soldAt: admin.firestore.FieldValue.serverTimestamp() // Rule 2 support
-           });
+    return await adminDb.runTransaction(async (tx) => {
+      const orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) throw new HttpError("Order not found", 404);
+
+      const orderData = orderSnap.data();
+      if (orderData?.sellerId !== sellerId) throw new HttpError("Unauthorized", 403);
+
+      const status = orderData?.status;
+      if (status === 'completed') {
+        return; // idempotent success
+      }
+      if (status !== 'pending') {
+        throw new HttpError("Order is not pending", 400);
+      }
+
+      const productId = orderData?.productId as string | undefined;
+      if (!productId) throw new HttpError("Order has no productId", 400);
+      const productRef = adminDb.collection('products').doc(productId);
+      const productSnap = await tx.get(productRef);
+      if (!productSnap.exists) throw new HttpError("Product not found", 404);
+      const productData = productSnap.data() as Product;
+
+      const buyerId = orderData?.buyerId as string | undefined;
+      if (!buyerId) throw new HttpError("Order has no buyerId", 400);
+
+      let buyerEmail: string | null =
+        (productData.reservedForContact as string | null | undefined) ?? null;
+      if (!buyerEmail) {
+        try {
+          const buyerSnap = await tx.get(adminDb.collection('users').doc(buyerId));
+          if (buyerSnap.exists) {
+            const data = buyerSnap.data() as { email?: string | null };
+            buyerEmail = data?.email ?? null;
+          }
+        } catch (err) {
+          console.error("No se pudo leer el perfil del comprador al confirmar", { buyerId, err });
+        }
+      }
+
+      // Rule 1: Confirm -> SOLD
+      tx.update(orderRef, { status: 'completed' });
+      tx.update(productRef, {
+        status: 'sold',
+        soldAt: admin.firestore.FieldValue.serverTimestamp(), // Rule 2 support
+        finalBuyerUserId: buyerId,
+        finalBuyerContact: buyerEmail ?? productData.finalBuyerContact ?? null,
+        finalDealPrice: productData.price ?? orderData?.price ?? null,
+        finalizedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reservedForUserId: buyerId,
+        reservedForContact: buyerEmail ?? productData.reservedForContact ?? null,
       });
+    });
   }
 
   static async rejectOrder(sellerId: string, orderId: string) {
-      // Implement Rule 7
-      const orderRef = adminDb.collection('orders').doc(orderId);
-      
-      return await adminDb.runTransaction(async (tx) => {
-          const orderSnap = await tx.get(orderRef);
-          if (!orderSnap.exists) throw new Error("Order not found");
-          
-          const orderData = orderSnap.data();
-          if (orderData?.sellerId !== sellerId) throw new Error("Unauthorized");
-          if (orderData?.status !== 'pending') throw new Error("Order not pending");
+    if (!orderId) {
+      throw new HttpError("Missing orderId", 400);
+    }
+    // Implement Rule 7
+    const orderRef = adminDb.collection('orders').doc(orderId);
 
-          const productRef = adminDb.collection('products').doc(orderData.productId);
-          
-          // Rule 7: Reject -> CANCELLED, Product -> ACTIVE
-          tx.update(orderRef, { status: 'cancelled' });
-          tx.update(productRef, { status: 'active' }); // Remove reservedAt if needed
-      });
+    return await adminDb.runTransaction(async (tx) => {
+      const orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) throw new HttpError("Order not found", 404);
+
+      const orderData = orderSnap.data();
+      if (orderData?.sellerId !== sellerId) throw new HttpError("Unauthorized", 403);
+
+      const status = orderData?.status;
+      if (status === 'cancelled') {
+        return; // idempotent
+      }
+      if (status !== 'pending') throw new HttpError("Order is not pending", 400);
+
+      const productId = orderData?.productId as string | undefined;
+      if (!productId) throw new HttpError("Order has no productId", 400);
+      const productRef = adminDb.collection('products').doc(productId);
+
+      // Rule 7: Reject -> CANCELLED, Product -> ACTIVE
+      tx.update(orderRef, { status: 'cancelled' });
+      tx.update(productRef, { status: 'active' }); // Remove reservedAt if needed
+    });
   }
 }

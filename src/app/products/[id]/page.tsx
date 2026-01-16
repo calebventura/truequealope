@@ -65,6 +65,7 @@ export default function ProductDetailPage() {
     tone?: "info" | "error" | "success";
   } | null>(null);
   const [confirmBuyOpen, setConfirmBuyOpen] = useState(false);
+  const [purchaseLocked, setPurchaseLocked] = useState(false);
 
   const trendBadges = useMemo(() => {
     if (!product?.trendTags || product.trendTags.length === 0) return [];
@@ -302,8 +303,9 @@ export default function ProductDetailPage() {
 
     setBuying(true);
     try {
-      const orderId = await createOrder(product.id!);
-      showAlert(`Orden creada con éxito. ID: ${orderId.orderId}`, {
+      const order = await createOrder(product.id!);
+      setPurchaseLocked(true);
+      showAlert(`Orden creada con éxito. ID: ${order.orderId}`, {
         tone: "success",
         title: "Orden creada",
       });
@@ -313,6 +315,7 @@ export default function ProductDetailPage() {
         tone: "error",
         title: "No se pudo crear la orden",
       });
+      setPurchaseLocked(false);
     } finally {
       setBuying(false);
     }
@@ -551,6 +554,8 @@ export default function ProductDetailPage() {
     ["product", "service"].includes(t)
   );
   const isMixed = acceptsMoney && acceptsTrade;
+  const referentialPrice =
+    product && typeof product.price === "number" ? product.price : null;
 
   const sellerIsOwner = user?.uid === product?.sellerId;
   const productCommunityIds = product
@@ -576,6 +581,7 @@ export default function ProductDetailPage() {
 
   const buyDisabled =
     buying ||
+    purchaseLocked ||
     contacting ||
     product?.status === "reserved" ||
     (!isGiveaway && product?.price == null);
@@ -833,41 +839,61 @@ export default function ProductDetailPage() {
                 </h1>
 
                 {isGiveaway ? (
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
-                    GRATIS (Regalo)
-                  </p>
-                ) : acceptsMoney && product.price != null ? (
                   <div className="flex flex-col gap-1 mb-2">
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {`S/. ${product.price.toLocaleString()}`}
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      Regalo
                     </p>
-                    {isPermuta && (
-                      <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 font-medium">
-                          Precio referencial total
-                        </span>
-                        <div className="relative inline-block group">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4 text-gray-500 dark:text-gray-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          <div className="absolute z-10 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-md bg-gray-900 text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-                            {permutaTooltipText}
-                          </div>
-                        </div>
-                      </div>
+                    {referentialPrice !== null && (
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Valor referencial: S/. {referentialPrice.toLocaleString()}
+                      </p>
                     )}
                   </div>
+                ) : isPermuta && referentialPrice !== null ? (
+                  <div className="flex flex-col gap-1 mb-2">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {`S/. ${referentialPrice.toLocaleString()}`}
+                    </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 font-medium">
+                        Precio referencial total
+                      </span>
+                      <div className="relative inline-block group">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 text-gray-500 dark:text-gray-400"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <div className="absolute z-10 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-md bg-gray-900 text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                          {permutaTooltipText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : acceptsMoney && referentialPrice !== null ? (
+                  <div className="flex flex-col gap-1 mb-2">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {`S/. ${referentialPrice.toLocaleString()}`}
+                    </p>
+                    {acceptsTrade && !isPermuta && (
+                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                        Acepta trueque al valor referencial
+                      </p>
+                    )}
+                  </div>
+                ) : referentialPrice !== null ? (
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Valor referencial: S/. {referentialPrice.toLocaleString()}
+                  </p>
                 ) : (
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     {acceptsTrade ? "Solo trueque/intercambio" : "Consultar precio"}

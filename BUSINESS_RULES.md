@@ -11,8 +11,8 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 - **`deleted`**: borrado lógico; no visible en listados públicos.
 
 ### Flujo de transacción
-1) **Intención de compra**: valida estado; pasa a `reserved`; crea orden `pending`.
-2) **Confirmación vendedor**: acepta → producto `sold`, orden `completed`. Rechaza → producto `active`, orden `cancelled`.
+1) **Intención de compra**: valida estado; pasa a `reserved`; crea orden `pending` y guarda `reservedForUserId` + `reservedForContact` (correo del comprador si existe perfil).
+2) **Confirmación vendedor**: acepta → producto `sold`, orden `completed`, fija `finalBuyerUserId`, `finalBuyerContact`, `finalDealPrice`, `finalizedAt`. Rechaza → producto `active`, orden `cancelled`.
 3) **Expiración de reserva**: configurable (`NEXT_PUBLIC_RESERVATION_TIME_MINUTES`). Si expiró, otro comprador puede reservar y la reserva previa se invalida.
 
 ## 2. Visibilidad
@@ -55,6 +55,7 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 ## 8. Métricas y ofertas en Firestore
 - **Clicks de contacto**: `products/{productId}/contactLogs` con `{ userId, sellerId, channel, createdAt }` (canal `whatsapp`, `instagram`, `other`). Lectura autenticada; creación por usuarios autenticados para ese producto.
 - **Ofertas de permuta**: `products/{productId}/offers` con `{ userId, sellerId, productId, itemOffer, cashOffer, type: "permuta", createdAt }`. Lectura: vendedor o autor; creación: usuario autenticado y dueño del click.
+- **Órdenes**: `orders/{orderId}` almacena la reserva (status `pending`) y referencia al comprador/vendedor/producto. En el producto se actualizan `reservedForUserId`/`reservedForContact` al crear, y `finalBuyerUserId`/`finalBuyerContact`/`finalDealPrice` al confirmar.
 
 ## 9. Publicación (formulario)
 - Imágenes obligatorias para productos.
