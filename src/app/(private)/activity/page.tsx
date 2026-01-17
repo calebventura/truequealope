@@ -24,6 +24,7 @@ import { getContactClicksCount, logContactClick } from "@/lib/contact";
 import { CATEGORIES } from "@/lib/constants";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type ActivityTab = "seller" | "buyer";
 type ProductStatus = "active" | "reserved" | "sold" | "deleted";
@@ -1280,48 +1281,24 @@ function SellerActivity({ userId }: { userId: string }) {
       </div>
     )}
     {pendingActionModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-              pendingActionModal.action === "confirm"
-                ? "bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100"
-                : "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100"
-            }`}>
-              {pendingActionModal.action === "confirm" ? "Confirmar venta" : "Rechazar solicitud"}
-            </span>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {pendingActionModal.productTitle}
-            </h3>
-          </div>
-          <p className="text-sm text-gray-700 dark:text-gray-200">
-            {pendingActionModal.action === "confirm"
-              ? "¿Deseas confirmar esta venta?"
-              : "¿Deseas rechazar esta solicitud de compra?"}
-          </p>
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setPendingActionModal(null)}
-              disabled={orderActionLoading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                void processOrderAction(pendingActionModal.orderId, pendingActionModal.action);
-                setPendingActionModal(null);
-              }}
-              disabled={orderActionLoading}
-              className={pendingActionModal.action === "confirm"
-                ? "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500"
-                : "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"}
-            >
-              {orderActionLoading ? "Procesando..." : "Sí, continuar"}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ConfirmModal
+        open={true}
+        title={pendingActionModal.action === "confirm" ? "Confirmar venta" : "Rechazar solicitud"}
+        description={
+          pendingActionModal.action === "confirm"
+            ? "¿Deseas confirmar esta venta?"
+            : "¿Deseas rechazar esta solicitud de compra?"
+        }
+        confirmLabel="Sí, continuar"
+        cancelLabel="Cancelar"
+        tone={pendingActionModal.action === "confirm" ? "default" : "destructive"}
+        loading={orderActionLoading}
+        onConfirm={() => {
+          void processOrderAction(pendingActionModal.orderId, pendingActionModal.action);
+          setPendingActionModal(null);
+        }}
+        onCancel={() => setPendingActionModal(null)}
+      />
     )}
     </>
   );

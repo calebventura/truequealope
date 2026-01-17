@@ -10,6 +10,7 @@ export type AlertModalProps = {
   description: string;
   tone?: AlertTone;
   primaryLabel?: string;
+  secondaryLabel?: string;
   onClose: () => void;
   onConfirm?: () => void;
 };
@@ -36,6 +37,7 @@ export function AlertModal({
   description,
   tone = "info",
   primaryLabel = "Cerrar",
+  secondaryLabel = "Cancelar",
   onClose,
   onConfirm,
 }: AlertModalProps) {
@@ -44,9 +46,15 @@ export function AlertModal({
   const styles = toneStyles[tone];
 
   const handlePrimary = () => {
-    onConfirm?.();
-    onClose();
+    if (onConfirm) {
+      onConfirm();
+      onClose();
+    } else {
+      onClose();
+    }
   };
+
+  const showSecondary = Boolean(onConfirm);
 
   return (
     <div
@@ -74,7 +82,16 @@ export function AlertModal({
         >
           {description}
         </p>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          {showSecondary && (
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30"
+            >
+              {secondaryLabel}
+            </Button>
+          )}
           <Button variant="primary" onClick={handlePrimary}>
             {primaryLabel}
           </Button>

@@ -16,6 +16,7 @@ import { getCommunityById } from "@/lib/communities";
 import { createPermutaOffer } from "@/lib/offers";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getTrendById, isTrendActive } from "@/lib/trends";
 
 const resolveProfileDate = (value: unknown): Date | null => {
@@ -1397,7 +1398,7 @@ export default function ProductDetailPage() {
           tone={alertModal?.tone}
           onClose={() => setAlertModal(null)}
         />
-        <AlertModal
+        <ConfirmModal
           open={confirmBuyOpen}
           title="Confirmar compra"
           description={
@@ -1405,10 +1406,11 @@ export default function ProductDetailPage() {
               ? `Vas a comprar "${product.title}" por S/. ${product.price.toLocaleString()}. ¿Deseas continuar?`
               : `Vas a reclamar "${product?.title ?? "este producto"}" sin costo. ¿Deseas continuar?`
           }
-          tone="info"
-          primaryLabel={buying ? "Procesando..." : "Confirmar"}
+          confirmLabel={buying ? "Procesando..." : "Confirmar"}
+          cancelLabel="Cancelar"
           onConfirm={confirmBuy}
-          onClose={() => setConfirmBuyOpen(false)}
+          onCancel={() => setConfirmBuyOpen(false)}
+          loading={buying}
         />
       </div>
     </div>
