@@ -9,7 +9,7 @@ const productSchema = z
     listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z.array(z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"] as const)).min(1),
     exchangeCashDelta: z.number().optional(),
-    price: z.number().gt(0, "Ingresa un valor mayor a 0"),
+    price: z.number().optional(),
     wantedProducts: z.string().optional(),
     wantedServices: z.string().optional(),
     // ... other fields are less relevant for this specific logic test
@@ -27,9 +27,7 @@ const productSchema = z
         if (data.price === undefined || data.price === null || data.price <= 0) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["price"], message: "Ingresa el valor total" });
         }
-        if (data.exchangeCashDelta === undefined || data.exchangeCashDelta === null || data.exchangeCashDelta < 0) {
-             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["exchangeCashDelta"], message: "Ingresa la diferencia" });
-        }
+        // Diferencia en efectivo es opcional en la publicación (se negocia en la oferta)
         
         const hasWantedProduct = !!data.wantedProducts?.trim();
         const hasWantedService = !!data.wantedServices?.trim();
@@ -183,13 +181,12 @@ describe('Release 1.2 - Strict Exchange Rules (Zod Validation)', () => {
                 acceptedExchangeTypes: ["exchange_plus_cash"],
                 wantedProducts: "Car"
             };
-            const result = productSchema.safeParse(input);
-            expect(result.success).toBe(false);
-            if (!result.success) {
+        const result = productSchema.safeParse(input);
+        expect(result.success).toBe(false);
+        if (!result.success) {
                 expect(result.error.issues.some(i => i.path.includes("price"))).toBe(true);
-                expect(result.error.issues.some(i => i.path.includes("exchangeCashDelta"))).toBe(true);
-            }
-        });
+        }
+      });
 
         it('should require at least ONE wanted description (Product OR Service)', () => {
             const input = { 

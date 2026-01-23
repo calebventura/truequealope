@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useProfileCompletionGuard } from "@/hooks/useProfileCompletionGuard";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -10,6 +11,7 @@ export default function PrivateLayout({
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
+  const { checking } = useProfileCompletionGuard(user, loading);
   const router = useRouter();
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export default function PrivateLayout({
     }
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading || checking) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>

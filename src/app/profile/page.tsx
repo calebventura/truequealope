@@ -21,6 +21,7 @@ import {
   normalizeDistrict,
   parseLocationParts,
 } from "@/lib/locations";
+import { validateProfile } from "./validation";
 
 const resolveProfileLocation = (profile: Partial<UserProfile>) => {
   const fallback = parseLocationParts(profile.address ?? null);
@@ -51,6 +52,7 @@ function ProfileContent() {
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next");
   const nextPath = nextParam?.startsWith("/") ? nextParam : null;
+  const mustCompleteProfile = searchParams.get("completeProfile") === "1";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,10 +67,20 @@ function ProfileContent() {
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const provinceOptions = selectedDepartment
     ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
     : [];
   const districtOptions = selectedDepartment ? LOCATIONS[selectedDepartment] : [];
+
+  useEffect(() => {
+    if (mustCompleteProfile) {
+      setMessage({
+        type: "error",
+        text: "Completa tu perfil para continuar.",
+      });
+    }
+  }, [mustCompleteProfile]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -160,6 +172,22 @@ function ProfileContent() {
     e.preventDefault();
     if (!user) return;
 
+    const { errors: newErrors, normalized } = validateProfile({
+      displayName: formData.displayName,
+      phoneNumber: formData.phoneNumber,
+      instagramUser: formData.instagramUser,
+      aboutMe: formData.aboutMe,
+      department: selectedDepartment,
+      province: selectedProvince,
+      district: selectedDistrict,
+    });
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      setMessage({ type: "error", text: "Corrige los campos marcados." });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
 
@@ -188,6 +216,10 @@ function ProfileContent() {
 
       const updatedData: Partial<UserProfile> = {
         ...formData,
+        displayName: normalized.name,
+        phoneNumber: normalized.phone,
+        instagramUser: normalized.instagram || null,
+        aboutMe: normalized.aboutMe || null,
         photoURL,
         updatedAt: new Date(),
         email: user.email,
@@ -484,7 +516,6 @@ function ProfileContent() {
                       className="block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 text-gray-500 dark:text-gray-400 cursor-not-allowed transition-colors"
 
                     />
-
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
 
                       El correo electrónico no se puede cambiar.
@@ -536,7 +567,11 @@ function ProfileContent() {
                       placeholder="Tu nombre"
 
                     />
-
+                    {errors.displayName && (
+                      <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        {errors.displayName}
+                      </p>
+                    )}
                   </div>
 
                 </div>
@@ -585,6 +620,11 @@ function ProfileContent() {
 
                   </div>
 
+                  {errors.phoneNumber && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      {errors.phoneNumber}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
 
                     Necesario para que te puedan contactar.
@@ -619,6 +659,11 @@ function ProfileContent() {
                       placeholder="usuario_ig"
                     />
                   </div>
+                  {errors.instagramUser && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      {errors.instagramUser}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Opcional. Se mostrará un botón en tus productos.
                   </p>
@@ -641,14 +686,19 @@ function ProfileContent() {
                       onChange={(e) =>
                         setFormData({ ...formData, aboutMe: e.target.value })
                       }
-                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
-                      placeholder="Cuenta brevemente sobre ti y cómo prefieres coordinar los trueques."
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Se mostrará en tus publicaciones para generar confianza.
-                  </p>
+                    className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
+                    placeholder="Cuenta brevemente sobre ti y cómo prefieres coordinar los trueques."
+                  />
                 </div>
+                {errors.aboutMe && (
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                    {errors.aboutMe}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Se mostrará en tus publicaciones para generar confianza.
+                </p>
+              </div>
 
                 {/* Ubicación */}
                 <div className="sm:col-span-2">
@@ -667,6 +717,11 @@ function ProfileContent() {
                       </option>
                     ))}
                   </select>
+                  {errors.department && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      {errors.department}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
@@ -686,6 +741,11 @@ function ProfileContent() {
                         </option>
                       ))}
                   </select>
+                  {errors.province && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      {errors.province}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
@@ -705,6 +765,11 @@ function ProfileContent() {
                         </option>
                       ))}
                   </select>
+                  {errors.district && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      {errors.district}
+                    </p>
+                  )}
                 </div>
 
               </div>
