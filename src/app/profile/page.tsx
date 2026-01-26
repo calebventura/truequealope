@@ -14,12 +14,14 @@ import {
   LOCATIONS,
   Department,
   PROVINCES_BY_DEPARTMENT,
+  DEPARTMENTS,
   formatDepartmentLabel,
   formatLocationPart,
   normalizeDepartment,
   normalizeProvince,
   normalizeDistrict,
   parseLocationParts,
+  getDistrictsFor,
 } from "@/lib/locations";
 import { validateProfile } from "./validation";
 
@@ -71,7 +73,9 @@ function ProfileContent() {
   const provinceOptions = selectedDepartment
     ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
     : [];
-  const districtOptions = selectedDepartment ? LOCATIONS[selectedDepartment] : [];
+  const districtOptions = selectedDepartment
+    ? getDistrictsFor(selectedDepartment, selectedProvince)
+    : [];
 
   useEffect(() => {
     if (mustCompleteProfile) {
@@ -152,8 +156,23 @@ function ProfileContent() {
     if (department) {
       const defaultProvince = PROVINCES_BY_DEPARTMENT[department]?.[0] ?? "";
       setSelectedProvince(defaultProvince);
+      const defaultDistrict =
+        getDistrictsFor(department, defaultProvince)?.[0] ?? "";
+      setSelectedDistrict(defaultDistrict);
+      setFormData((prev) => ({
+        ...prev,
+        department,
+        province: defaultProvince || null,
+        district: defaultDistrict || null,
+      }));
     } else {
       setSelectedProvince("");
+      setFormData((prev) => ({
+        ...prev,
+        department: null,
+        province: null,
+        district: null,
+      }));
     }
     setSelectedDistrict("");
   };
@@ -161,11 +180,24 @@ function ProfileContent() {
   const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const province = e.target.value;
     setSelectedProvince(province);
-    setSelectedDistrict("");
+    const defaultDistrict =
+      selectedDepartment && province
+        ? getDistrictsFor(selectedDepartment, province)?.[0] ?? ""
+        : "";
+    setSelectedDistrict(defaultDistrict);
+    setFormData((prev) => ({
+      ...prev,
+      province: province || null,
+      district: defaultDistrict || null,
+    }));
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedDistrict(e.target.value);
+    setFormData((prev) => ({
+      ...prev,
+      district: e.target.value || null,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -711,7 +743,7 @@ function ProfileContent() {
                     className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
                   >
                     <option value="">Selecciona un departamento</option>
-                    {(Object.keys(LOCATIONS) as Department[]).map((dept) => (
+                    {DEPARTMENTS.map((dept) => (
                       <option key={dept} value={dept}>
                         {formatDepartmentLabel(dept)}
                       </option>

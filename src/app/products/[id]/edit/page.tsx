@@ -15,10 +15,12 @@ import {
   LOCATIONS,
   Department,
   PROVINCES_BY_DEPARTMENT,
+  DEPARTMENTS,
   formatDepartmentLabel,
   formatLocationPart,
   buildLocationLabel,
   parseLocationParts,
+  getDistrictsFor,
 } from "@/lib/locations";
 import { Button } from "@/components/ui/Button";
 import { COMMUNITIES } from "@/lib/communities";
@@ -570,7 +572,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Selecciona un departamento</option>
-              {(Object.keys(LOCATIONS) as Department[]).map((dept) => (
+              {DEPARTMENTS.map((dept) => (
                 <option key={dept} value={dept}>
                   {formatDepartmentLabel(dept)}
                 </option>
@@ -602,13 +604,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             <select
               value={selectedDistrict}
               onChange={handleDistrictChange}
-              disabled={!selectedDepartment}
+              disabled={!selectedDepartment || !selectedProvince}
               data-field="location"
               className="mt-1 block w-full border border-gray-300 dark:border-gray-700 p-2 rounded-md disabled:opacity-50 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Selecciona un distrito</option>
               {selectedDepartment &&
-                LOCATIONS[selectedDepartment].map((dist) => (
+                getDistrictsFor(selectedDepartment, selectedProvince).map((dist) => (
                   <option key={dist} value={dist}>
                     {formatLocationPart(dist)}
                   </option>

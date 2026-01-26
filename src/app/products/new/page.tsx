@@ -2,7 +2,7 @@
 
 
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 import { useForm } from "react-hook-form";
 
@@ -36,21 +36,15 @@ import { uploadImage } from "@/lib/storage";
 import { Product, ExchangeType } from "@/types/product";
 import { CATEGORIES, CONDITIONS, DRAFT_KEY } from "@/lib/constants";
 import {
-
   LOCATIONS,
-
   Department,
-
   PROVINCES_BY_DEPARTMENT,
-
+  DEPARTMENTS,
   formatDepartmentLabel,
-
   formatLocationPart,
-
   buildLocationLabel,
-
   parseLocationParts,
-
+  getDistrictsFor,
 } from "@/lib/locations";
 
 import { COMMUNITIES } from "@/lib/communities";
@@ -64,7 +58,11 @@ import { AlertModal } from "@/components/ui/AlertModal";
 const productSchema = z
   .object({
     title: z.string().min(3, "El título debe tener al menos 3 caracteres"),
-    description: z.string().optional(),
+    description: z
+      .string()
+      .trim()
+      .min(15, "Agrega una descripción (mínimo 15 caracteres)")
+      .max(2000, "La descripción es demasiado larga"),
 
     listingType: z.enum(["product", "service"] as const),
     acceptedExchangeTypes: z
@@ -197,6 +195,7 @@ export default function NewProductPage() {
   const [generalError, setGeneralError] = useState("");
   const [draftRestored, setDraftRestored] = useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const publishIntentRef = useRef(false);
   const [alertModal, setAlertModal] = useState<{
 
     title: string;
@@ -281,6 +280,7 @@ export default function NewProductPage() {
       otherCategoryLabel: "",
       trendTags: [],
       location: "",
+      description: "",
     },
   });
 
@@ -580,12 +580,15 @@ export default function NewProductPage() {
     setSelectedDepartment(dept);
 
     const defaultProvince = dept ? PROVINCES_BY_DEPARTMENT[dept]?.[0] ?? "" : "";
+    const defaultDistrict =
+      dept && defaultProvince
+        ? getDistrictsFor(dept, defaultProvince)?.[0] ?? ""
+        : "";
 
     setSelectedProvince(defaultProvince);
+    setSelectedDistrict(defaultDistrict);
 
-    setSelectedDistrict("");
-
-    updateLocationValue(dept, defaultProvince, "");
+    updateLocationValue(dept, defaultProvince, defaultDistrict);
 
   };
 
@@ -597,7 +600,13 @@ export default function NewProductPage() {
 
     setSelectedProvince(province);
 
-    updateLocationValue(selectedDepartment, province, selectedDistrict);
+    const defaultDistrict =
+      selectedDepartment && province
+        ? getDistrictsFor(selectedDepartment, province)?.[0] ?? ""
+        : "";
+    setSelectedDistrict(defaultDistrict);
+
+    updateLocationValue(selectedDepartment, province, defaultDistrict);
 
   };
 
@@ -612,6 +621,54 @@ export default function NewProductPage() {
     updateLocationValue(selectedDepartment, selectedProvince, dist);
 
   };
+
+  // Prefill location from user profile when no draft restored
+  useEffect(() => {
+    const preloadProfileLocation = async () => {
+      if (!user || authLoading || draftRestored || selectedDepartment) return;
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (!snap.exists()) return;
+        const data = snap.data() as {
+          address?: string | null;
+          department?: string | null;
+          province?: string | null;
+          district?: string | null;
+        };
+        const combined =
+          [data.district, data.province, data.department]
+            .filter(Boolean)
+            .join(", ") || data.address || null;
+        const parsed = parseLocationParts(combined);
+        if (!parsed.department) return;
+
+        const provinceFilled =
+          parsed.province ||
+          PROVINCES_BY_DEPARTMENT[parsed.department]?.[0] ||
+          "";
+        const districtFilled =
+          parsed.district ||
+          getDistrictsFor(parsed.department, provinceFilled)?.[0] ||
+          "";
+
+        setSelectedDepartment(parsed.department);
+        setSelectedProvince(provinceFilled);
+        setSelectedDistrict(districtFilled);
+        updateLocationValue(parsed.department, provinceFilled, districtFilled);
+      } catch (err) {
+        console.warn("No se pudo precargar ubicación de perfil", err);
+      }
+    };
+
+    preloadProfileLocation();
+  }, [
+    authLoading,
+    draftRestored,
+    selectedDepartment,
+    user,
+    updateLocationValue,
+    setSelectedDepartment,
+  ]);
 
 
 
@@ -631,6 +688,9 @@ export default function NewProductPage() {
 
 
   const onSubmit = async (data: ProductForm) => {
+    if (!publishIntentRef.current) {
+      return;
+    }
 
     setGeneralError("");
 
@@ -841,6 +901,30 @@ export default function NewProductPage() {
 
   };
 
+  const submitHandler = handleSubmit(onSubmit, () => setAttemptedSubmit(true));
+
+  const handleWizardSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setAttemptedSubmit(true);
+
+    const nativeSubmitter = (e as any).nativeEvent?.submitter as
+      | HTMLButtonElement
+      | undefined;
+    const action = nativeSubmitter?.dataset?.action;
+    const isPublishIntent =
+      action === "publish" || (!action && step === 3); // Enter on step 3 counts as publish
+
+    if (step < 3 || !isPublishIntent) {
+      publishIntentRef.current = false;
+      await nextStep();
+      return;
+    }
+
+    publishIntentRef.current = true;
+    await submitHandler(e);
+    publishIntentRef.current = false;
+  };
+
 
 
   useEffect(() => {
@@ -914,10 +998,7 @@ export default function NewProductPage() {
 
 
 
-      <form
-        onSubmit={handleSubmit(onSubmit, () => setAttemptedSubmit(true))}
-        className="space-y-6"
-      >
+      <form onSubmit={handleWizardSubmit} className="space-y-6">
         {step === 1 && (
 
           <>
@@ -1486,15 +1567,10 @@ export default function NewProductPage() {
                 >
 
                   <option value="">Selecciona un departamento</option>
-
-                  {(Object.keys(LOCATIONS) as Department[]).map((dept) => (
-
+                  {DEPARTMENTS.map((dept) => (
                     <option key={dept} value={dept}>
-
                       {formatDepartmentLabel(dept)}
-
                     </option>
-
                   ))}
 
                 </select>
@@ -1563,7 +1639,7 @@ export default function NewProductPage() {
 
                   onChange={handleDistrictChange}
 
-                  disabled={!selectedDepartment}
+                  disabled={!selectedDepartment || !selectedProvince}
 
                   data-field="location"
 
@@ -1572,18 +1648,14 @@ export default function NewProductPage() {
                 >
 
                   <option value="">Selecciona un distrito</option>
-
                   {selectedDepartment &&
-
-                    LOCATIONS[selectedDepartment].map((dist) => (
-
-                      <option key={dist} value={dist}>
-
-                        {formatLocationPart(dist)}
-
-                      </option>
-
-                    ))}
+                    getDistrictsFor(selectedDepartment, selectedProvince).map(
+                      (dist) => (
+                        <option key={dist} value={dist}>
+                          {formatLocationPart(dist)}
+                        </option>
+                      )
+                    )}
 
                 </select>
 
@@ -1728,25 +1800,22 @@ export default function NewProductPage() {
             {/* Descripción */}
 
             <div>
-
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-
-                Descripción (opcional)
-
+                Descripción (obligatoria)
               </label>
 
               <textarea
-
                 {...register("description")}
-
                 rows={4}
-
+                data-field="description"
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 p-2 text-base transition-colors"
-
                 placeholder="Describe brevemente el estado y detalles."
-
               />
-
+              {errors.description && (
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                  {errors.description.message}
+                </p>
+              )}
             </div>
 
           </>
@@ -1788,6 +1857,7 @@ export default function NewProductPage() {
               type="button"
 
               onClick={nextStep}
+              data-action="next"
 
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors"
 
@@ -1802,6 +1872,7 @@ export default function NewProductPage() {
             <button
 
               type="submit"
+              data-action="publish"
 
               disabled={isSubmitting || uploading}
 

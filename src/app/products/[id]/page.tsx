@@ -18,6 +18,7 @@ import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getTrendById, isTrendActive } from "@/lib/trends";
+import { buildLocationLabel, parseLocationParts } from "@/lib/locations";
 
 const resolveProfileDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -78,6 +79,15 @@ export default function ProductDetailPage() {
         title: trend.title,
         icon: trend.icon,
       }));
+  }, [product]);
+
+  const productLocation = useMemo(() => {
+    if (!product?.location) return "";
+    const parsed = parseLocationParts(product.location);
+    if (parsed.department && parsed.province && parsed.district) {
+      return buildLocationLabel(parsed.district, parsed.province, parsed.department);
+    }
+    return product.location;
   }, [product]);
 
   const showAlert = (
@@ -838,6 +848,31 @@ export default function ProductDetailPage() {
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   {product.title}
                 </h1>
+
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 text-gray-500 dark:text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4 9 5.567 9 7.5 10.343 11 12 11z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 22s7-4.5 7-11.5C19 5.477 15.866 2 12 2S5 5.477 5 10.5C5 17.5 12 22 12 22z"
+                    />
+                  </svg>
+                  <span className="font-medium">
+                    {productLocation || "Ubicación no especificada"}
+                  </span>
+                </div>
 
                 {isGiveaway ? (
                   <div className="flex flex-col gap-1 mb-2">

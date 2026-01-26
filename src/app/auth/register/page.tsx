@@ -23,9 +23,11 @@ import { db } from "@/lib/firebaseClient";
 import {
   LOCATIONS,
   PROVINCES_BY_DEPARTMENT,
+  DEPARTMENTS,
   Department,
   formatDepartmentLabel,
   formatLocationPart,
+  getDistrictsFor,
 } from "@/lib/locations";
 import {
   nameRegex,
@@ -129,7 +131,7 @@ function RegisterContent() {
     ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
     : [];
   const districtOptions = selectedDepartment
-    ? LOCATIONS[selectedDepartment]
+    ? getDistrictsFor(selectedDepartment, selectedProvince)
     : [];
 
   const needsProfileCompletion = async (uid: string) => {
@@ -451,7 +453,7 @@ function RegisterContent() {
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
             >
               <option value="">Selecciona un departamento</option>
-              {Object.keys(LOCATIONS).map((depKey) => (
+              {DEPARTMENTS.map((depKey) => (
                 <option key={depKey} value={depKey}>
                   {formatDepartmentLabel(depKey as Department)}
                 </option>
