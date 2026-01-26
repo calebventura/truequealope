@@ -25,11 +25,7 @@ export function validateName(value: string) {
 
 export function validatePhone(value: string) {
   const normalized = value.trim();
-  if (!normalized)
-    return {
-      normalized,
-      error: "Ingresa tu teléfono (WhatsApp)",
-    };
+  if (!normalized) return { normalized, error: null };
   if (!phoneRegex.test(normalized))
     return {
       normalized,
@@ -66,4 +62,13 @@ export function validateLocation(
     if (!district) errors.district = "Selecciona un distrito";
   }
   return { errors };
+}
+
+export function validateContact(phone?: string, instagram?: string) {
+  const hasPhone = Boolean(phone && phone.trim());
+  const hasInstagram = Boolean(instagram && instagram.trim());
+  if (!hasPhone && !hasInstagram) {
+    return "Agrega tu teléfono o tu Instagram";
+  }
+  return null;
 }

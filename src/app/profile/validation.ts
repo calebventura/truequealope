@@ -4,6 +4,7 @@ import {
   validateLocation,
   validateName,
   validatePhone,
+  validateContact,
 } from "@/lib/userValidation";
 
 export type ProfileInput = {
@@ -30,6 +31,12 @@ export function validateProfile(input: ProfileInput) {
 
   const aboutCheck = validateAbout(input.aboutMe);
   if (aboutCheck.error) errors.aboutMe = aboutCheck.error;
+
+  const contactError = validateContact(phoneCheck.normalized, instagramCheck.normalized);
+  if (contactError) {
+    errors.phoneNumber = errors.phoneNumber || contactError;
+    if (!errors.instagramUser) errors.instagramUser = contactError;
+  }
 
   const locationCheck = validateLocation(
     input.department,

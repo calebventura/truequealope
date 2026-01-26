@@ -35,6 +35,7 @@ import {
   validateLocation,
   validateName,
   validatePhone,
+  validateContact,
 } from "@/lib/userValidation";
 
 const registerSchema = z
@@ -52,7 +53,9 @@ const registerSchema = z
     phone: z
       .string()
       .trim()
-      .regex(phoneRegex, "Debe ser un celular válido de 9 dígitos"),
+      .regex(phoneRegex, "Debe ser un celular válido de 9 dígitos")
+      .optional()
+      .or(z.literal("").transform(() => "")),
     instagramUser: z
       .string()
       .trim()
@@ -79,7 +82,18 @@ const registerSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
-  });
+  })
+  .refine(
+    (data) =>
+      validateContact(
+        data.phone?.trim() || "",
+        data.instagramUser?.trim().replace(/^@/, "") || ""
+      ) === null,
+    {
+      message: "Ingresa teléfono o Instagram",
+      path: ["phone"],
+    }
+  );
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -152,7 +166,7 @@ function RegisterContent() {
   const onSubmit = async (data: RegisterForm) => {
     setError("");
     const normalizedName = normalizeWhitespace(data.name);
-    const normalizedPhone = data.phone.trim();
+    const normalizedPhone = (data.phone || "").trim();
     const department = data.department as Department;
     const province = data.province;
     const district = data.district;

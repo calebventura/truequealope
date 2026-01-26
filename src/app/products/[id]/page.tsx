@@ -1195,35 +1195,39 @@ export default function ProductDetailPage() {
                                     </button>
                                 )}
 
-                                {/* Botón Unificado WhatsApp */}
-                                <button
-                                    onClick={whatsappAction}
-                                    disabled={whatsappDisabled}
-                                    className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                    {contacting
-                                    ? "Abriendo WhatsApp..."
-                                    : whatsappLabel}
-                                </button>
+                                {/* Botón WhatsApp (solo si hay número) */}
+                                {sellerProfile?.phoneNumber && (
+                                  <button
+                                      onClick={whatsappAction}
+                                      disabled={whatsappDisabled}
+                                      className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
+                                  >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                      {contacting
+                                      ? "Abriendo WhatsApp..."
+                                      : whatsappLabel}
+                                  </button>
+                                )}
 
-                                {/* Botón Instagram */}
+                                {/* Botón Instagram (solo si hay usuario) */}
                                 {sellerProfile?.instagramUser && (
-                                    <button
-                                    onClick={openInstagram}
-                                    disabled={contacting}
-                                    className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                    >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
-                                    Contactar por Instagram
-                                    </button>
+                                  <button
+                                  onClick={openInstagram}
+                                  disabled={contacting}
+                                  className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                  >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
+                                  Contactar por Instagram
+                                  </button>
                                 )}
                             </div>
 
                             {user && !sellerLoading && !sellerProfile?.phoneNumber && (
+                              sellerProfile?.instagramUser ? null : (
                                 <p className="text-xs text-red-600 dark:text-red-400 text-center">
-                                El vendedor aún no cargó su número de WhatsApp.
+                                  El vendedor aún no cargó su número de WhatsApp.
                                 </p>
+                              )
                             )}
                           </div>
                         </div>
