@@ -43,7 +43,7 @@ const productSchema = z
         z.enum(["money", "product", "service", "exchange_plus_cash", "giveaway"])
       )
       .min(1, "Selecciona al menos una opción"),
-    price: z.number({ invalid_type_error: "Ingresa el valor referencial" }).optional(),
+    price: z.number().optional(),
     wantedProducts: z.string().optional(),
     wantedServices: z.string().optional(),
     categoryId: z.string().min(1, "Selecciona una categoría"),
@@ -687,13 +687,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
       {alertModal && (
         <AlertModal
-          isOpen={Boolean(alertModal)}
+          open={Boolean(alertModal)}
           onClose={() => setAlertModal(null)}
           onConfirm={() => setAlertModal(null)}
           title={alertModal.title}
           description={alertModal.description}
           tone={alertModal.tone}
-          confirmText="Entendido"
+          primaryLabel="Entendido"
         />
       )}
     </div>

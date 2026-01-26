@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -18,6 +19,7 @@ import {
 import { db, auth } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Product } from "@/types/product";
+
 import { Order } from "@/types/order";
 import { Button } from "@/components/ui/Button";
 import { getContactClicksCount, logContactClick } from "@/lib/contact";
@@ -1651,22 +1653,21 @@ function BuyerActivity({ userId }: { userId: string }) {
 function ActivityContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const tabFromQuery = useMemo<ActivityTab>(() => {
-    const t = searchParams.get("tab");
-    return t === "buyer" ? "buyer" : "seller";
-  }, [searchParams]);
-
-  const [tab, setTab] = useState<ActivityTab>(tabFromQuery);
+  const [tab, setTab] = useState<ActivityTab>("buyer");
 
   useEffect(() => {
-    setTab(tabFromQuery);
-  }, [tabFromQuery]);
+    const t =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("tab")
+        : null;
+    setTab(t === "buyer" ? "buyer" : "seller");
+  }, []);
 
   const setTabAndUrl = (nextTab: ActivityTab) => {
     setTab(nextTab);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : ""
+    );
     params.set("tab", nextTab);
     router.replace(`/activity?${params.toString()}`);
   };
@@ -1737,9 +1738,18 @@ function ActivityContent() {
 }
 
 export default function ActivityPage() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center">Cargando...</div>}>
-      <ActivityContent />
-    </Suspense>
+  const ActivityNoSSR = useMemo(
+    () =>
+      dynamic(() => Promise.resolve(ActivityContent), {
+        ssr: false,
+        loading: () => (
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          </div>
+        ),
+      }),
+    []
   );
+
+  return <ActivityNoSSR />;
 }
