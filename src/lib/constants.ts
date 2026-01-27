@@ -15,3 +15,10 @@ export const CONDITIONS = [
 ];
 
 export const DRAFT_KEY = "product_draft";
+
+// Paginación
+export const DEFAULT_EXPLORE_PAGE_SIZE =
+  Number(process.env.NEXT_PUBLIC_PAGE_SIZE_EXPLORE) || 12;
+export const DEFAULT_DASHBOARD_PAGE_SIZE =
+  Number(process.env.NEXT_PUBLIC_PAGE_SIZE_DASHBOARD) || 20;
+export const PAGE_SIZE_OPTIONS = [10, 12, 20, 50];
