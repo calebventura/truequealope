@@ -35,6 +35,7 @@ function SearchContent() {
   const initialQuery = searchParams.get("q") || "";
 
   const [searchTerm, setSearchTerm] = useState(initialQuery);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQuery);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTrends, setSelectedTrends] = useState<string[]>([]);
   const [exchangeFilters, setExchangeFilters] = useState<ExchangeFilter[]>([]);
@@ -58,6 +59,7 @@ function SearchContent() {
 
   useEffect(() => {
     setSearchTerm(searchParams.get("q") || "");
+    setDebouncedSearch(searchParams.get("q") || "");
 
     const parseMulti = (key: string) =>
       searchParams
@@ -83,7 +85,7 @@ function SearchContent() {
 
   const syncQueryFromState = useCallback(() => {
     const params = new URLSearchParams();
-    if (searchTerm) params.set("q", searchTerm);
+    if (debouncedSearch) params.set("q", debouncedSearch);
     selectedCategories.forEach((id) => params.append("category", id));
     selectedTrends.forEach((id) => params.append("trend", id));
     communityFilters.forEach((id) => params.append("community", id));
@@ -104,7 +106,7 @@ function SearchContent() {
     pathname,
     router,
     searchParams,
-    searchTerm,
+    debouncedSearch,
     selectedCategories,
     selectedTrends,
   ]);
@@ -115,7 +117,6 @@ function SearchContent() {
     setVisibleCount(DEFAULT_EXPLORE_PAGE_SIZE);
   }, [
     syncQueryFromState,
-    searchTerm,
     selectedCategories,
     selectedTrends,
     communityFilters,
@@ -125,7 +126,9 @@ function SearchContent() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setDebouncedSearch(searchTerm.trim());
     syncQueryFromState();
+    setVisibleCount(DEFAULT_EXPLORE_PAGE_SIZE);
   };
 
   const applyTrendFilters = useCallback(
@@ -371,8 +374,8 @@ function SearchContent() {
       filtered = filtered.filter((product) => categorySet.has(product.categoryId));
     }
 
-    if (searchTerm) {
-      const lowerTerm = searchTerm.toLowerCase();
+    if (debouncedSearch) {
+      const lowerTerm = debouncedSearch.toLowerCase();
       filtered = filtered.filter(
         (product) =>
           product.title.toLowerCase().includes(lowerTerm) ||
@@ -421,6 +424,7 @@ function SearchContent() {
     applyTrendFilters,
     selectedCategories,
     searchTerm,
+    debouncedSearch,
     communityFilters,
     exchangeFilters,
     listingFilters,

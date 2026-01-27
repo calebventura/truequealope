@@ -84,3 +84,8 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 - Fuente: `docs/locations.json` generado desde el dataset nacional de distritos (incluye Callao). Listas priorizan Lima, Arequipa y Callao.
 - Helpers: `LOCATIONS`, `PROVINCES_BY_DEPARTMENT`, `getDistrictsFor` y normalizadores en `src/lib/locations.ts`.
 - El detalle del producto muestra la ubicación declarada del anuncio debajo del título.
+
+## 12. Búsqueda y exploración
+- El buscador de `/search` solo filtra al presionar **Buscar** (clic o Enter); no filtra por carácter para evitar parpadeos.
+- Paginación en cliente: botón **Mostrar más** en home y search. Tamaño por defecto 12 (configurable vía `NEXT_PUBLIC_PAGE_SIZE_EXPLORE`).
+- Dashboard vendedor: paginación con selector 10/12/20/50 (default 20; `NEXT_PUBLIC_PAGE_SIZE_DASHBOARD`).
