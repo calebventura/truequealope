@@ -10,6 +10,8 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { useSearchParams } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 const forgotPasswordSchema = z.object({
   email: z.string().email("Email inválido"),
 });
@@ -131,4 +133,3 @@ export default function ForgotPasswordPage() {
     </Suspense>
   );
 }
-

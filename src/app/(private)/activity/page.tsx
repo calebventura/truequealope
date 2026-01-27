@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -18,12 +19,14 @@ import {
 import { db, auth } from "@/lib/firebaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Product } from "@/types/product";
+
 import { Order } from "@/types/order";
 import { Button } from "@/components/ui/Button";
 import { getContactClicksCount, logContactClick } from "@/lib/contact";
-import { CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, DEFAULT_DASHBOARD_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/constants";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type ActivityTab = "seller" | "buyer";
 type ProductStatus = "active" | "reserved" | "sold" | "deleted";
@@ -98,6 +101,8 @@ function SellerActivity({ userId }: { userId: string }) {
     productTitle: string;
   } | null>(null);
   const [orderActionLoading, setOrderActionLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(DEFAULT_DASHBOARD_PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const showAlert = (
     description: string,
@@ -353,6 +358,10 @@ function SellerActivity({ userId }: { userId: string }) {
     fetchMyProducts();
   }, [userId]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize, showSold, products.length]);
+
   const handleStatusChange = async (
     productId: string,
     newStatus: ProductStatus,
@@ -502,6 +511,15 @@ function SellerActivity({ userId }: { userId: string }) {
     ...activeReservedProducts,
     ...(showSold ? soldProducts : []),
   ];
+  const totalPages = Math.max(
+    1,
+    Math.ceil(Math.max(visibleProducts.length, 1) / pageSize)
+  );
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const paginatedProducts = visibleProducts.slice(
+    (currentPageSafe - 1) * pageSize,
+    currentPageSafe * pageSize
+  );
 
   const getAcceptedTypes = (product: Product) => {
     const accepted = product.acceptedExchangeTypes
@@ -807,6 +825,53 @@ function SellerActivity({ userId }: { userId: string }) {
         </div>
       )}
 
+      {visibleProducts.length > 0 && !loadingProducts && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            Mostrando {paginatedProducts.length} de {visibleProducts.length} publicaciones
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-600 dark:text-gray-300">
+              Por página:
+            </label>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm px-3 py-1"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                disabled={currentPageSafe <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-gray-700 dark:text-gray-200">
+                {currentPageSafe} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                disabled={currentPageSafe >= totalPages}
+                onClick={() =>
+                  setCurrentPage((p) =>
+                    p + 1 > totalPages ? totalPages : p + 1
+                  )
+                }
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loadingProducts ? (
         <div className="text-center py-10 text-gray-600 dark:text-gray-400">Cargando tus productos...</div>
       ) : visibleProducts.length === 0 ? (
@@ -835,7 +900,7 @@ function SellerActivity({ userId }: { userId: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {visibleProducts.map((product) => (
+          {paginatedProducts.map((product) => (
             <div
               key={product.id}
               className="flex flex-col md:flex-row md:items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 gap-4 bg-white dark:bg-gray-800 shadow-sm transition-colors"
@@ -1280,48 +1345,24 @@ function SellerActivity({ userId }: { userId: string }) {
       </div>
     )}
     {pendingActionModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-              pendingActionModal.action === "confirm"
-                ? "bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100"
-                : "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100"
-            }`}>
-              {pendingActionModal.action === "confirm" ? "Confirmar venta" : "Rechazar solicitud"}
-            </span>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {pendingActionModal.productTitle}
-            </h3>
-          </div>
-          <p className="text-sm text-gray-700 dark:text-gray-200">
-            {pendingActionModal.action === "confirm"
-              ? "¿Deseas confirmar esta venta?"
-              : "¿Deseas rechazar esta solicitud de compra?"}
-          </p>
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setPendingActionModal(null)}
-              disabled={orderActionLoading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                void processOrderAction(pendingActionModal.orderId, pendingActionModal.action);
-                setPendingActionModal(null);
-              }}
-              disabled={orderActionLoading}
-              className={pendingActionModal.action === "confirm"
-                ? "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500"
-                : "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"}
-            >
-              {orderActionLoading ? "Procesando..." : "Sí, continuar"}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ConfirmModal
+        open={true}
+        title={pendingActionModal.action === "confirm" ? "Confirmar venta" : "Rechazar solicitud"}
+        description={
+          pendingActionModal.action === "confirm"
+            ? "¿Deseas confirmar esta venta?"
+            : "¿Deseas rechazar esta solicitud de compra?"
+        }
+        confirmLabel="Sí, continuar"
+        cancelLabel="Cancelar"
+        tone={pendingActionModal.action === "confirm" ? "default" : "destructive"}
+        loading={orderActionLoading}
+        onConfirm={() => {
+          void processOrderAction(pendingActionModal.orderId, pendingActionModal.action);
+          setPendingActionModal(null);
+        }}
+        onCancel={() => setPendingActionModal(null)}
+      />
     )}
     </>
   );
@@ -1674,22 +1715,21 @@ function BuyerActivity({ userId }: { userId: string }) {
 function ActivityContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const tabFromQuery = useMemo<ActivityTab>(() => {
-    const t = searchParams.get("tab");
-    return t === "buyer" ? "buyer" : "seller";
-  }, [searchParams]);
-
-  const [tab, setTab] = useState<ActivityTab>(tabFromQuery);
+  const [tab, setTab] = useState<ActivityTab>("buyer");
 
   useEffect(() => {
-    setTab(tabFromQuery);
-  }, [tabFromQuery]);
+    const t =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("tab")
+        : null;
+    setTab(t === "buyer" ? "buyer" : "seller");
+  }, []);
 
   const setTabAndUrl = (nextTab: ActivityTab) => {
     setTab(nextTab);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : ""
+    );
     params.set("tab", nextTab);
     router.replace(`/activity?${params.toString()}`);
   };
@@ -1760,9 +1800,18 @@ function ActivityContent() {
 }
 
 export default function ActivityPage() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center">Cargando...</div>}>
-      <ActivityContent />
-    </Suspense>
+  const ActivityNoSSR = useMemo(
+    () =>
+      dynamic(() => Promise.resolve(ActivityContent), {
+        ssr: false,
+        loading: () => (
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          </div>
+        ),
+      }),
+    []
   );
+
+  return <ActivityNoSSR />;
 }

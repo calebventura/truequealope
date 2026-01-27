@@ -1,5 +1,6 @@
 "use client";
 
+import type { ChangeEvent } from "react";
 import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,18 +18,62 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ensureUserProfile } from "@/lib/userProfile";
-
-import {
-  doc,
-  setDoc,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
+import {
+  LOCATIONS,
+  PROVINCES_BY_DEPARTMENT,
+  DEPARTMENTS,
+  Department,
+  formatDepartmentLabel,
+  formatLocationPart,
+  getDistrictsFor,
+} from "@/lib/locations";
+import {
+  nameRegex,
+  phoneRegex,
+  instagramRegex,
+  normalizeWhitespace,
+  validateLocation,
+  validateName,
+  validatePhone,
+  validateContact,
+} from "@/lib/userValidation";
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, "El nombre es muy corto"),
-    email: z.string().email("Email inválido"),
-    phone: z.string().regex(/^9\d{8}$/, "Debe ser un celular válido de 9 dígitos"),
+    name: z
+      .string()
+      .trim()
+      .min(2, "El nombre es muy corto")
+      .max(60, "El nombre es muy largo")
+      .regex(
+        nameRegex,
+        "Nombre inválido (solo letras, espacios, guion, apóstrofo)"
+      ),
+    email: z.string().trim().email("Email inválido"),
+    phone: z
+      .string()
+      .trim()
+      .regex(phoneRegex, "Debe ser un celular válido de 9 dígitos")
+      .optional()
+      .or(z.literal("").transform(() => "")),
+    instagramUser: z
+      .string()
+      .trim()
+      .optional()
+      .refine(
+        (value) => !value || instagramRegex.test(value.replace(/^@/, "")),
+        "Usuario de Instagram inválido"
+      ),
+    aboutMe: z
+      .string()
+      .trim()
+      .max(300, "Máximo 300 caracteres")
+      .optional(),
+    department: z.string().min(1, "Selecciona un departamento"),
+    province: z.string().min(1, "Selecciona una provincia"),
+    district: z.string().min(1, "Selecciona un distrito"),
     password: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -39,13 +84,27 @@ const registerSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
-  });
+  })
+  .refine(
+    (data) =>
+      validateContact(
+        data.phone?.trim() || "",
+        data.instagramUser?.trim().replace(/^@/, "") || ""
+      ) === null,
+    {
+      message: "Ingresa teléfono o Instagram",
+      path: ["phone"],
+    }
+  );
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
 function RegisterContent() {
   const [error, setError] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -55,30 +114,97 @@ function RegisterContent() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      instagramUser: "",
+      aboutMe: "",
+      department: "",
+      province: "",
+      district: "",
+    },
   });
+
+  const provinceOptions = selectedDepartment
+    ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
+    : [];
+  const districtOptions = selectedDepartment
+    ? getDistrictsFor(selectedDepartment, selectedProvince)
+    : [];
+
+  const needsProfileCompletion = async (uid: string) => {
+    const snap = await getDoc(doc(db, "users", uid));
+    const data = snap.data() || {};
+    const nameError = validateName(data.displayName ?? "").error;
+    const phoneError = validatePhone(data.phoneNumber ?? "").error;
+    const locationErrors = validateLocation(
+      data.department,
+      data.province,
+      data.district
+    ).errors;
+    return Boolean(nameError || phoneError || Object.keys(locationErrors).length);
+  };
+
+  const routeAfterAuth = async (uid: string) => {
+    try {
+      const shouldComplete = await needsProfileCompletion(uid);
+      if (shouldComplete) {
+        router.push(
+          `/profile?completeProfile=1&next=${encodeURIComponent(nextPath)}`
+        );
+        return;
+      }
+      router.push(nextPath);
+    } catch (err) {
+      console.error("Error verificando datos del perfil:", err);
+      router.push(
+        `/profile?completeProfile=1&next=${encodeURIComponent(nextPath)}`
+      );
+    }
+  };
 
   const onSubmit = async (data: RegisterForm) => {
     setError("");
+    const normalizedName = normalizeWhitespace(data.name);
+    const normalizedPhone = (data.phone || "").trim();
+    const department = data.department as Department;
+    const province = data.province;
+    const district = data.district;
+    const address = [district, province, department].filter(Boolean).join(", ");
+    const instagramUser =
+      data.instagramUser?.trim().replace(/^@/, "") || null;
+    const aboutMe = data.aboutMe?.trim() || null;
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        data.email,
+        data.email.trim(),
         data.password
       );
       await updateProfile(userCredential.user, {
-        displayName: data.name,
+        displayName: normalizedName,
       });
       await ensureUserProfile(userCredential.user);
-      
-      // Save phone number
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        phoneNumber: data.phone
-      }, { merge: true });
 
-      router.push(nextPath);
+      await setDoc(
+        doc(db, "users", userCredential.user.uid),
+        {
+          displayName: normalizedName,
+          phoneNumber: normalizedPhone,
+          instagramUser,
+          aboutMe,
+          department,
+          province,
+          district,
+          address,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
+
+      await routeAfterAuth(userCredential.user.uid);
     } catch (e) {
       setError("Error al registrarse. El email podría estar en uso.");
       console.error(e);
@@ -91,7 +217,7 @@ function RegisterContent() {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           await ensureUserProfile(result.user);
-          router.push(nextPath);
+          await routeAfterAuth(result.user.uid);
         }
       } catch (e) {
         console.error("Google redirect error:", e);
@@ -103,6 +229,34 @@ function RegisterContent() {
     void handleRedirect();
   }, [router, nextPath]);
 
+  const handleDepartmentChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value as Department | "";
+    setSelectedDepartment(value);
+    setValue("department", value);
+    const defaultProvince =
+      value && PROVINCES_BY_DEPARTMENT[value]?.[0]
+        ? PROVINCES_BY_DEPARTMENT[value][0]
+        : "";
+    setSelectedProvince(defaultProvince);
+    setValue("province", defaultProvince);
+    setSelectedDistrict("");
+    setValue("district", "");
+  };
+
+  const handleProvinceChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    setSelectedProvince(value);
+    setValue("province", value);
+    setSelectedDistrict("");
+    setValue("district", "");
+  };
+
+  const handleDistrictChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    setSelectedDistrict(value);
+    setValue("district", value);
+  };
+
   const handleGoogleRegister = async () => {
     setError("");
     setGoogleLoading(true);
@@ -111,7 +265,7 @@ function RegisterContent() {
     try {
       const result = await signInWithPopup(auth, provider);
       await ensureUserProfile(result.user);
-      router.push(nextPath);
+      await routeAfterAuth(result.user.uid);
     } catch (e) {
       const code = (e as { code?: string }).code;
       if (
@@ -157,11 +311,7 @@ function RegisterContent() {
         onClick={handleGoogleRegister}
         disabled={googleLoading || isSubmitting}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 48 48"
-          className="h-5 w-5"
-        >
+        <svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5">
           <path
             fill="#FFC107"
             d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8.1 3.1l5.7-5.7C34.2 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.1-.1-2.3-.4-3.5Z"
@@ -204,9 +354,7 @@ function RegisterContent() {
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.name && (
-              <p className="mt-1 text-xs text-red-500">
-                {errors.name.message}
-              </p>
+              <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>
             )}
           </div>
         </div>
@@ -223,9 +371,7 @@ function RegisterContent() {
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.email && (
-              <p className="mt-1 text-xs text-red-500">
-                {errors.email.message}
-              </p>
+              <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
             )}
           </div>
         </div>
@@ -242,9 +388,123 @@ function RegisterContent() {
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
             />
             {errors.phone && (
-              <p className="mt-1 text-xs text-red-500">
-                {errors.phone.message}
+              <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>
+            )}
+            {!errors.phone && (
+              <p className="mt-1 text-xs text-gray-500">
+                Necesario para que te puedan contactar.
               </p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Usuario de Instagram <span className="text-gray-400">(opcional)</span>
+          </label>
+          <div className="mt-1">
+            <input
+              {...register("instagramUser")}
+              type="text"
+              placeholder="@tuusuario"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
+            />
+            {errors.instagramUser && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.instagramUser.message}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Opcional. Se mostrará un botón en tus productos.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Sobre mi <span className="text-gray-400">(opcional)</span>
+          </label>
+          <div className="mt-1">
+            <textarea
+              {...register("aboutMe")}
+              rows={3}
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="Cuenta brevemente sobre ti y cómo prefieres coordinar."
+            />
+            {errors.aboutMe && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.aboutMe.message}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Máximo 300 caracteres. Se mostrará en tus publicaciones para generar confianza.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Departamento
+            </label>
+            <select
+              {...register("department", { onChange: handleDepartmentChange })}
+              value={selectedDepartment}
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+            >
+              <option value="">Selecciona un departamento</option>
+              {DEPARTMENTS.map((depKey) => (
+                <option key={depKey} value={depKey}>
+                  {formatDepartmentLabel(depKey as Department)}
+                </option>
+              ))}
+            </select>
+            {errors.department && (
+              <p className="mt-1 text-xs text-red-500">{errors.department.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Provincia
+            </label>
+            <select
+              {...register("province", { onChange: handleProvinceChange })}
+              value={selectedProvince}
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+              disabled={!selectedDepartment}
+            >
+              <option value="">Selecciona una provincia</option>
+              {provinceOptions.map((province) => (
+                <option key={province} value={province}>
+                  {formatLocationPart(province)}
+                </option>
+              ))}
+            </select>
+            {errors.province && (
+              <p className="mt-1 text-xs text-red-500">{errors.province.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Distrito
+            </label>
+            <select
+              {...register("district", { onChange: handleDistrictChange })}
+              value={selectedDistrict}
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+              disabled={!selectedProvince}
+            >
+              <option value="">Selecciona un distrito</option>
+              {districtOptions.map((district) => (
+                <option key={district} value={district}>
+                  {formatLocationPart(district)}
+                </option>
+              ))}
+            </select>
+            {errors.district && (
+              <p className="mt-1 text-xs text-red-500">{errors.district.message}</p>
             )}
           </div>
         </div>

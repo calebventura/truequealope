@@ -43,43 +43,6 @@ export const Navbar = () => {
             <span className="leading-none text-indigo-600 dark:text-indigo-400">Truequéalope</span>
           </Link>
 
-          {/* Search Bar - Order 3 on mobile (new row), Order 2 on desktop */}
-          <div className="w-full order-3 md:order-2 md:flex-1 md:max-w-md md:mx-8">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.target as HTMLFormElement;
-                const input = form.elements.namedItem("q") as HTMLInputElement;
-                if (input.value.trim()) {
-                  router.push(`/search?q=${encodeURIComponent(input.value)}`);
-                }
-              }}
-              className="relative"
-            >
-              <input
-                name="q"
-                type="text"
-                placeholder="Buscar artículos..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-base transition-colors"
-              />
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg
-                  className="h-5 w-5 text-gray-400 dark:text-gray-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-            </form>
-          </div>
-
           {/* User Menu & Theme Toggle - Order 2 on mobile, Order 3 on desktop */}
           <div className="flex items-center gap-4 order-2 md:order-3">
             {/* Theme Toggle */}

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
-import { createOrder } from "@/lib/orders";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
@@ -17,6 +16,7 @@ import { createPermutaOffer } from "@/lib/offers";
 import { getAcceptedExchangeTypes } from "@/lib/productFilters";
 import { AlertModal } from "@/components/ui/AlertModal";
 import { getTrendById, isTrendActive } from "@/lib/trends";
+import { buildLocationLabel, parseLocationParts } from "@/lib/locations";
 
 const resolveProfileDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -39,7 +39,6 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [contacting, setContacting] = useState(false);
-  const [buying, setBuying] = useState(false);
   const [sellerProfile, setSellerProfile] =
     useState<Partial<UserProfile> | null>(null);
   const [sellerLoading, setSellerLoading] = useState(false);
@@ -64,8 +63,6 @@ export default function ProductDetailPage() {
     description: string;
     tone?: "info" | "error" | "success";
   } | null>(null);
-  const [confirmBuyOpen, setConfirmBuyOpen] = useState(false);
-  const [purchaseLocked, setPurchaseLocked] = useState(false);
 
   const trendBadges = useMemo(() => {
     if (!product?.trendTags || product.trendTags.length === 0) return [];
@@ -77,6 +74,15 @@ export default function ProductDetailPage() {
         title: trend.title,
         icon: trend.icon,
       }));
+  }, [product]);
+
+  const productLocation = useMemo(() => {
+    if (!product?.location) return "";
+    const parsed = parseLocationParts(product.location);
+    if (parsed.department && parsed.province && parsed.district) {
+      return buildLocationLabel(parsed.district, parsed.province, parsed.department);
+    }
+    return product.location;
   }, [product]);
 
   const showAlert = (
@@ -130,10 +136,6 @@ export default function ProductDetailPage() {
     messageText?: string,
     options?: { beforeLog?: () => Promise<void> }
   ) => {
-    if (!user) {
-      router.push(`/auth/login?next=/products/${id}`);
-      return;
-    }
     if (!product) return;
 
     let fetchedPhone: string | null | undefined;
@@ -177,10 +179,12 @@ export default function ProductDetailPage() {
       if (options?.beforeLog) {
         await options.beforeLog();
       }
-      await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
-      if (user.uid === product.sellerId) {
-        const refreshed = await getContactClicksCount(product.id!, product.sellerId);
-        setContactClicks(refreshed);
+      if (user) {
+        await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
+        if (user.uid === product.sellerId) {
+          const refreshed = await getContactClicksCount(product.id!, product.sellerId);
+          setContactClicks(refreshed);
+        }
       }
     } catch (error) {
       console.error("Error registrando clic de contacto:", error);
@@ -277,52 +281,6 @@ export default function ProductDetailPage() {
         });
       },
     });
-  };
-
-  const handleBuy = async () => {
-    if (!user) {
-      router.push(`/auth/login?next=/products/${id}`);
-      return;
-    }
-    if (!product) return;
-
-    const priceToUse =
-      product.price != null
-        ? product.price
-        : isGiveaway
-        ? 0
-        : null;
-
-    if (priceToUse == null) {
-      showAlert("Este producto no tiene precio de venta.", {
-        tone: "info",
-        title: "Precio no disponible",
-      });
-      return;
-    }
-
-    setBuying(true);
-    try {
-      const order = await createOrder(product.id!);
-      setPurchaseLocked(true);
-      showAlert(`Orden creada con éxito. ID: ${order.orderId}`, {
-        tone: "success",
-        title: "Orden creada",
-      });
-    } catch (error) {
-      console.error("Error al comprar:", error);
-      showAlert(`Error al crear la orden: ${(error as Error).message}`, {
-        tone: "error",
-        title: "No se pudo crear la orden",
-      });
-      setPurchaseLocked(false);
-    } finally {
-      setBuying(false);
-    }
-  };
-  const confirmBuy = async () => {
-    setConfirmBuyOpen(false);
-    await handleBuy();
   };
 
   const handleShare = async () => {
@@ -576,13 +534,10 @@ export default function ProductDetailPage() {
       : ["Público"];
   const whatsappDisabled =
     contacting ||
-    buying ||
     (user ? sellerLoading || !sellerProfile?.phoneNumber : false);
 
   const buyDisabled =
-    buying ||
-    purchaseLocked ||
-    contacting ||
+    whatsappDisabled ||
     product?.status === "reserved" ||
     (!isGiveaway && product?.price == null);
 
@@ -641,6 +596,8 @@ export default function ProductDetailPage() {
     : "Contactar por WhatsApp";
   const shouldShowTradeFields =
     isPermuta || (acceptsTrade && contactIntent === "trade");
+  const showBuyCta =
+    (acceptsMoney || isGiveaway) && contactIntent === "buy" && !isPermuta;
   const permutaTooltipText =
     "Precio referencial total: valor estimado del producto/servicio. Lo que ofreces (producto o servicio) + el monto que propones debe acercarse a este valor.";
 
@@ -837,6 +794,31 @@ export default function ProductDetailPage() {
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   {product.title}
                 </h1>
+
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 text-gray-500 dark:text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4 9 5.567 9 7.5 10.343 11 12 11z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 22s7-4.5 7-11.5C19 5.477 15.866 2 12 2S5 5.477 5 10.5C5 17.5 12 22 12 22z"
+                    />
+                  </svg>
+                  <span className="font-medium">
+                    {productLocation || "Ubicación no especificada"}
+                  </span>
+                </div>
 
                 {isGiveaway ? (
                   <div className="flex flex-col gap-1 mb-2">
@@ -1177,9 +1159,9 @@ export default function ProductDetailPage() {
                             {/* Acciones Principales */}
                             <div className="flex flex-col gap-3">
                                 {/* Botón Comprar (Solo si es Venta y hay precio) */}
-                                {(acceptsMoney || isGiveaway) && contactIntent === 'buy' && !isPermuta && (
+                                {showBuyCta && (
                                     <button
-                                    onClick={() => setConfirmBuyOpen(true)}
+                                    onClick={whatsappAction}
                                     disabled={buyDisabled}
                                     className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
                                         buyDisabled
@@ -1188,41 +1170,43 @@ export default function ProductDetailPage() {
                                     }`}
                                     >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                                    {buying
-                                        ? "Procesando..."
-                                        : isGiveaway ? "Lo quiero (Gratis)" : "Comprar ahora"}
+                                    {isGiveaway ? "Lo quiero (Contactar)" : "Contactar para comprar"}
                                     </button>
                                 )}
 
-                                {/* Botón Unificado WhatsApp */}
-                                <button
-                                    onClick={whatsappAction}
-                                    disabled={whatsappDisabled}
-                                    className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                    {contacting
-                                    ? "Abriendo WhatsApp..."
-                                    : whatsappLabel}
-                                </button>
+                                {/* Botón WhatsApp (solo si hay número) */}
+                                {sellerProfile?.phoneNumber && !showBuyCta && (
+                                  <button
+                                      onClick={whatsappAction}
+                                      disabled={whatsappDisabled}
+                                      className={`w-full bg-white dark:bg-gray-800 border text-green-700 dark:text-green-400 py-3 px-4 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${contactIntent === 'trade' ? 'border-indigo-600 text-indigo-700 dark:border-indigo-500 dark:text-indigo-400 hover:bg-indigo-50' : 'border-green-600'}`}
+                                  >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.517 5.516l1.13-2.256a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                      {contacting
+                                      ? "Abriendo WhatsApp..."
+                                      : whatsappLabel}
+                                  </button>
+                                )}
 
-                                {/* Botón Instagram */}
+                                {/* Botón Instagram (solo si hay usuario) */}
                                 {sellerProfile?.instagramUser && (
-                                    <button
-                                    onClick={openInstagram}
-                                    disabled={contacting}
-                                    className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                    >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
-                                    Contactar por Instagram
-                                    </button>
+                                  <button
+                                  onClick={openInstagram}
+                                  disabled={contacting}
+                                  className="w-full bg-white dark:bg-gray-800 border border-pink-500 text-pink-600 dark:text-pink-400 py-3 px-4 rounded-lg font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                  >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" /><circle cx="17.25" cy="6.75" r=".75" fill="currentColor" /></svg>
+                                  Contactar por Instagram
+                                  </button>
                                 )}
                             </div>
 
                             {user && !sellerLoading && !sellerProfile?.phoneNumber && (
+                              sellerProfile?.instagramUser ? null : (
                                 <p className="text-xs text-red-600 dark:text-red-400 text-center">
-                                El vendedor aún no cargó su número de WhatsApp.
+                                  El vendedor aún no cargó su número de WhatsApp.
                                 </p>
+                              )
                             )}
                           </div>
                         </div>
@@ -1396,19 +1380,6 @@ export default function ProductDetailPage() {
           description={alertModal?.description ?? ""}
           tone={alertModal?.tone}
           onClose={() => setAlertModal(null)}
-        />
-        <AlertModal
-          open={confirmBuyOpen}
-          title="Confirmar compra"
-          description={
-            product?.price != null
-              ? `Vas a comprar "${product.title}" por S/. ${product.price.toLocaleString()}. ¿Deseas continuar?`
-              : `Vas a reclamar "${product?.title ?? "este producto"}" sin costo. ¿Deseas continuar?`
-          }
-          tone="info"
-          primaryLabel={buying ? "Procesando..." : "Confirmar"}
-          onConfirm={confirmBuy}
-          onClose={() => setConfirmBuyOpen(false)}
         />
       </div>
     </div>

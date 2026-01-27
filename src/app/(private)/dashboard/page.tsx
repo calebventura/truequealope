@@ -1,15 +1,8 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function DashboardRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/activity?tab=seller");
-  }, [router]);
-
-  return <div className="p-8 text-center">Redirigiendo...</div>;
+export default function DashboardPage() {
+  redirect("/activity?tab=seller");
 }
-

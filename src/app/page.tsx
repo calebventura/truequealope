@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
-import { CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, DEFAULT_EXPLORE_PAGE_SIZE } from "@/lib/constants";
 import {
   TrendConfig,
   getActiveTrends,
@@ -37,6 +37,7 @@ function HomePageContent() {
   const [communityFilters, setCommunityFilters] = useState<string[]>([]);
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [trendFilters, setTrendFilters] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(DEFAULT_EXPLORE_PAGE_SIZE);
   const trendOptions = getActiveTrends();
   const nowTimestamp = Date.now();
   const [filtersHydrated, setFiltersHydrated] = useState(false);
@@ -101,6 +102,7 @@ function HomePageContent() {
   useEffect(() => {
     if (!filtersHydrated) return;
     syncQueryFromState();
+    setVisibleCount(DEFAULT_EXPLORE_PAGE_SIZE);
   }, [
     syncQueryFromState,
     categoryFilters,
@@ -324,6 +326,11 @@ function HomePageContent() {
     (exchangeFilters.length > 0 ? 1 : 0) +
     (listingFilters.length > 0 ? 1 : 0);
 
+  const displayedProducts = filteredProducts.slice(0, visibleCount);
+  const hasMoreProducts = filteredProducts.length > visibleCount;
+  const loadMore = () =>
+    setVisibleCount((prev) => prev + DEFAULT_EXPLORE_PAGE_SIZE);
+
   const activeFilterPills = [
     categoryFilters.length > 0 && {
       key: "category",
@@ -452,17 +459,34 @@ function HomePageContent() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-6">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                href={`/products/${product.id}`}
-                currentUserId={user?.uid ?? null}
-                nowTimestamp={nowTimestamp}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-6">
+              {displayedProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  href={`/products/${product.id}`}
+                  currentUserId={user?.uid ?? null}
+                  nowTimestamp={nowTimestamp}
+                />
+              ))}
+            </div>
+            <div className="mt-6 flex justify-center">
+              {hasMoreProducts ? (
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Mostrar más
+                </button>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No hay más resultados.
+                </p>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

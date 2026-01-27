@@ -1,92 +1,109 @@
-export const LOCATIONS = {
-  LIMA: [
-    "Lima",
-    "Ancón",
-    "Ate",
-    "Barranco",
-    "Breña",
-    "Carabayllo",
-    "Chaclacayo",
-    "Chorrillos",
-    "Cieneguilla",
-    "Comas",
-    "El Agustino",
-    "Independencia",
-    "Jesús María",
-    "La Molina",
-    "La Victoria",
-    "Lince",
-    "Los Olivos",
-    "Lurigancho",
-    "Lurin",
-    "Magdalena del Mar",
-    "Miraflores",
-    "Pachacámac",
-    "Pucusana",
-    "Pueblo Libre",
-    "Puente Piedra",
-    "Punta Hermosa",
-    "Punta Negra",
-    "Rímac",
-    "San Bartolo",
-    "San Borja",
-    "San Isidro",
-    "San Juan de Lurigancho",
-    "San Juan de Miraflores",
-    "San Luis",
-    "San Martín de Porres",
-    "San Miguel",
-    "Santa Anita",
-    "Santa María del Mar",
-    "Santa Rosa",
-    "Santiago de Surco",
-    "Surquillo",
-    "Villa El Salvador",
-    "Villa María del Triunfo",
-  ],
-  AREQUIPA: [
-    "Arequipa",
-    "Alto Selva Alegre",
-    "Cayma",
-    "Cerro Colorado",
-    "Characato",
-    "Chiguata",
-    "Jacobo Hunter",
-    "José Luis Bustamante y Rivero",
-    "La Joya",
-    "Mariano Melgar",
-    "Miraflores",
-    "Mollebaya",
-    "Paucarpata",
-    "Pocsi",
-    "Polobaya",
-    "Quequeña",
-    "Sabandía",
-    "Sachaca",
-    "San Juan de Siguas",
-    "San Juan de Tarucani",
-    "Santa Isabel de Siguas",
-    "Santa Rita de Siguas",
-    "Socabaya",
-    "Tiabaya",
-    "Uchumayo",
-    "Vitor",
-    "Yanahuara",
-    "Yarabamba",
-    "Yura",
-  ],
-} as const;
+import locationsData from "../../docs/locations.json";
 
-export type Department = keyof typeof LOCATIONS;
-export const DEPARTMENT_LABELS: Record<Department, string> = {
-  LIMA: "Lima",
-  AREQUIPA: "Arequipa",
-};
+type LocationsJson = Record<
+  string,
+  { provinces: string[]; districts: Record<string, string[]> }
+>;
 
-export const PROVINCES_BY_DEPARTMENT: Record<Department, readonly string[]> = {
-  LIMA: ["Lima"],
-  AREQUIPA: ["Arequipa"],
-};
+const RAW_LOCATIONS = locationsData as LocationsJson;
+
+const PRIORITY_DEPARTMENTS = ["Lima", "Arequipa", "Callao"] as const;
+
+const normalize = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const departmentOrder = Object.keys(RAW_LOCATIONS).sort((a, b) => {
+  const pa = PRIORITY_DEPARTMENTS.indexOf(a as (typeof PRIORITY_DEPARTMENTS)[number]);
+  const pb = PRIORITY_DEPARTMENTS.indexOf(b as (typeof PRIORITY_DEPARTMENTS)[number]);
+  if (pa !== -1 || pb !== -1) {
+    return (pa === -1 ? Number.MAX_SAFE_INTEGER : pa) -
+      (pb === -1 ? Number.MAX_SAFE_INTEGER : pb);
+  }
+  return a.localeCompare(b, "es", { sensitivity: "base" });
+});
+
+export type Department = string;
+
+export const DEPARTMENTS: readonly Department[] = departmentOrder;
+
+export const DEPARTMENT_LABELS: Record<Department, string> = departmentOrder.reduce(
+  (acc, dept) => {
+    acc[dept] = dept;
+    return acc;
+  },
+  {} as Record<string, string>
+);
+
+export const PROVINCES_BY_DEPARTMENT: Record<Department, readonly string[]> =
+  departmentOrder.reduce((acc, dept) => {
+    const provinces = RAW_LOCATIONS[dept]?.provinces ?? [];
+    const sorted = [...provinces].sort((a, b) =>
+      a.localeCompare(b, "es", { sensitivity: "base" })
+    );
+    acc[dept] = sorted;
+    return acc;
+  }, {} as Record<string, readonly string[]>);
+
+export const DISTRICTS_BY_PROVINCE: Record<
+  Department,
+  Record<string, readonly string[]>
+> = departmentOrder.reduce((acc, dept) => {
+  const provinces = RAW_LOCATIONS[dept]?.provinces ?? [];
+  const districtsByProvince: Record<string, readonly string[]> = {};
+  provinces.forEach((prov) => {
+    const provDistricts =
+      RAW_LOCATIONS[dept]?.districts?.[prov] ??
+      RAW_LOCATIONS[dept]?.districts?.[prov.toUpperCase()] ??
+      [];
+    districtsByProvince[prov] = [...provDistricts].sort((a, b) =>
+      a.localeCompare(b, "es", { sensitivity: "base" })
+    );
+  });
+  acc[dept] = districtsByProvince;
+  return acc;
+}, {} as Record<Department, Record<string, readonly string[]>>);
+
+export const LOCATIONS: Record<Department, readonly string[]> = departmentOrder.reduce(
+  (acc, dept) => {
+    const provinces = RAW_LOCATIONS[dept]?.provinces ?? [];
+    const districtsSet = new Set<string>();
+    provinces.forEach((prov) => {
+      const provDistricts =
+        RAW_LOCATIONS[dept]?.districts?.[prov] ??
+        RAW_LOCATIONS[dept]?.districts?.[prov.toUpperCase()] ??
+        [];
+      provDistricts.forEach((d) => districtsSet.add(d));
+    });
+    const sortedDistricts = Array.from(districtsSet).sort((a, b) =>
+      a.localeCompare(b, "es", { sensitivity: "base" })
+    );
+    acc[dept] = sortedDistricts;
+    return acc;
+  },
+  {} as Record<string, readonly string[]>
+);
+
+// Backward-compatibility aliases with uppercase keys (e.g., LOCATIONS.LIMA)
+departmentOrder.forEach((dept) => {
+  const upper = dept.toUpperCase();
+  if (!(upper in PROVINCES_BY_DEPARTMENT)) {
+    PROVINCES_BY_DEPARTMENT[upper] = PROVINCES_BY_DEPARTMENT[dept];
+  }
+  if (!(upper in DISTRICTS_BY_PROVINCE)) {
+    DISTRICTS_BY_PROVINCE[upper] = DISTRICTS_BY_PROVINCE[dept];
+  }
+  if (!(upper in LOCATIONS)) {
+    LOCATIONS[upper] = LOCATIONS[dept];
+  }
+});
+
+const normalizeDepartmentMap = new Map<string, Department>(
+  departmentOrder.map((dept) => [normalize(dept), dept] as [string, Department])
+);
 
 const capitalizeLabel = (value: string) => {
   if (!value) return "";
@@ -111,10 +128,7 @@ export const normalizeDepartment = (
   value?: string | null
 ): Department | "" => {
   if (!value) return "";
-  const normalized = value.trim().toLowerCase();
-  const match = (Object.keys(LOCATIONS) as Department[]).find(
-    (dept) => dept.toLowerCase() === normalized
-  );
+  const match = normalizeDepartmentMap.get(normalize(value));
   return match ?? "";
 };
 
@@ -124,20 +138,28 @@ export const normalizeProvince = (
 ) => {
   const options = PROVINCES_BY_DEPARTMENT[department] ?? [];
   if (!value) return options[0] ?? "";
-  const normalized = value.trim().toLowerCase();
-  return options.find((opt) => opt.toLowerCase() === normalized) ?? options[0] ?? "";
+  const normalized = normalize(value);
+  return (
+    options.find((opt) => normalize(opt) === normalized) ??
+    options[0] ??
+    ""
+  );
 };
 
 export const normalizeDistrict = (
   department: Department,
-  value?: string | null
+  value?: string | null,
+  province?: string | null
 ) => {
+  const provKey = province ?? "";
+  const byProvince = provKey
+    ? DISTRICTS_BY_PROVINCE[department]?.[provKey]
+    : undefined;
+  const districts: readonly string[] = byProvince ?? LOCATIONS[department] ?? [];
   if (!value) return "";
-  const normalized = value.trim().toLowerCase();
+  const normalized = normalize(value);
   return (
-    LOCATIONS[department].find(
-      (district) => district.toLowerCase() === normalized
-    ) ?? ""
+    districts.find((district) => normalize(district) === normalized) ?? ""
   );
 };
 
@@ -180,7 +202,18 @@ export const parseLocationParts = (
       : tokens.length >= 2
       ? tokens[tokens.length - 2]
       : "";
-  const district = normalizeDistrict(department, districtToken);
+  const district = normalizeDistrict(department, districtToken, province);
 
   return { department, province, district };
+};
+
+export const getDistrictsFor = (
+  department?: Department | null,
+  province?: string | null
+): readonly string[] => {
+  if (!department) return [];
+  if (province && DISTRICTS_BY_PROVINCE[department]?.[province]) {
+    return DISTRICTS_BY_PROVINCE[department][province];
+  }
+  return LOCATIONS[department] ?? [];
 };

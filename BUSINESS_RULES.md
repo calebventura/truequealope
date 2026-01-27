@@ -24,7 +24,10 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 - Si está `reserved` y se edita, el comprador debe ver alerta/badge en su detalle de orden (pendiente implementación de aviso).
 
 ## 4. Validaciones de usuario
-- Teléfono: solo formato (regex, 9 dígitos Perú). No hay verificación SMS.
+- Teléfono: formato Perú de 9 dígitos (regex). No hay verificación SMS.
+- Instagram: `@usuario` válido (solo letras/números/puntos/guiones bajos, sin espacios).
+- **Contacto obligatorio**: en registro y edición de perfil debe existir al menos uno: teléfono o Instagram. Si se registra con Google, debe completar los datos faltantes antes de continuar usando la app.
+- Perfil requiere ubicación (departamento, provincia, distrito) usando el dataset nacional (Lima, Arequipa y Callao priorizados en listas).
 
 ## 5. Gestión del vendedor
 - Dashboard con “Solicitudes Pendientes” para aceptar/rechazar reservas.
@@ -40,9 +43,10 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 | **🎁 Regalo** | Donación. | Exclusivo con todas. | Ninguno (precio 0 implícito). |
 
 **Reglas de interfaz (publicación)**:
-- Elegir "Permuta" limpia Dinero/Regalo.
-- Elegir "Regalo" limpia todo.
-- Artículo y Servicio pueden convivir (trueque mixto).
+- Wizard de 3 pasos: el paso 3 (ubicación y detalles finales) solo se publica con click explícito en **Publicar**; avanzar de paso nunca dispara publicación.
+- Descripción del anuncio es **obligatoria** (mínimo 15 caracteres, máximo 2000).
+- Dirección: departamento/provincia/distrito requeridos; se autocompletan con la ubicación del perfil si existe, pero deben quedar seleccionados. Selects dependientes (provincia filtra distritos).
+- Elegir "Permuta" limpia Dinero/Regalo. Elegir "Regalo" limpia todo. Artículo y Servicio pueden convivir (trueque mixto).
 - En Permuta, el vendedor solo ingresa **precio referencial total**; se muestra ayuda aclaratoria.
 - Categoría **“Otros”**: obliga a describir la categoría en texto (`otherCategoryLabel`) tanto al crear como al editar.
 
@@ -51,6 +55,7 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 - **Trueque**: el interesado debe escribir qué ofrece antes de abrir WhatsApp; el mensaje se personaliza con su texto.
 - **Permuta**: el interesado debe ingresar producto/servicio ofrecido y monto; ambos van en el mensaje. Antes de abrir WhatsApp se registra la oferta.
 - **Tooltip**: en Permuta se muestra ayuda al lado del precio explicando "Precio referencial total".
+- Botones de contacto visibles según datos del vendedor: si no hay teléfono, solo Instagram; si hay ambos, se muestran ambos botones.
 
 ## 8. Métricas y ofertas en Firestore
 - **Clicks de contacto**: `products/{productId}/contactLogs` con `{ userId, sellerId, channel, createdAt }` (canal `whatsapp`, `instagram`, `other`). Lectura autenticada; creación por usuarios autenticados para ese producto.
@@ -60,8 +65,12 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 ## 9. Publicación (formulario)
 - Imágenes obligatorias para productos.
 - Condición obligatoria para productos.
+- Descripción obligatoria (15-2000 caracteres).
 - En Permuta ya no se ingresa "monto diferencial"; solo precio referencial total. Los campos "qué buscas" son requeridos según tipo de intercambio.
 - Categoría “Otros” obliga a capturar `otherCategoryLabel` (texto libre).
+- Ubicación requerida (departamento, provincia, distrito). Dataset completo Perú (prioriza Lima/Arequipa/Callao en la lista). Distrito se filtra por provincia.
+- Los selects de ubicación no muestran alertas hasta que el usuario intenta publicar; el mensaje de error aparece al validar el paso 3.
+- Se precarga la ubicación del perfil en nuevas publicaciones.
 
 ## 10. Cierre de operaciones (dashboard vendedor)
 - Asignación de persona por **correo** (no se usa teléfono) antes de cerrar; se verifica contra colección `users`.
@@ -70,3 +79,13 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
   - Trueque: pide correo + producto/servicio entregado.
   - Permuta: pide correo + producto/servicio entregado + monto de diferencia pagado.
 - Se registran en el producto los campos finales: `finalBuyerUserId`, `finalBuyerContact`, `finalDealPrice`, `finalDealItems`, `finalizedAt`. El estado pasa a `sold` y se muestra el resumen en historial y en el detalle del producto (para el vendedor).
+
+## 11. Datos geográficos
+- Fuente: `docs/locations.json` generado desde el dataset nacional de distritos (incluye Callao). Listas priorizan Lima, Arequipa y Callao.
+- Helpers: `LOCATIONS`, `PROVINCES_BY_DEPARTMENT`, `getDistrictsFor` y normalizadores en `src/lib/locations.ts`.
+- El detalle del producto muestra la ubicación declarada del anuncio debajo del título.
+
+## 12. Búsqueda y exploración
+- El buscador de `/search` solo filtra al presionar **Buscar** (clic o Enter); no filtra por carácter para evitar parpadeos.
+- Paginación en cliente: botón **Mostrar más** en home y search. Tamaño por defecto 12 (configurable vía `NEXT_PUBLIC_PAGE_SIZE_EXPLORE`).
+- Dashboard vendedor: paginación con selector 10/12/20/50 (default 20; `NEXT_PUBLIC_PAGE_SIZE_DASHBOARD`).
