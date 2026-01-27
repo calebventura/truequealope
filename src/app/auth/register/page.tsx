@@ -17,6 +17,7 @@ import { auth } from "@/lib/firebaseClient";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { TermsModal } from "@/components/TermsModal";
 import { ensureUserProfile } from "@/lib/userProfile";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
@@ -39,6 +40,7 @@ import {
   validatePhone,
   validateContact,
 } from "@/lib/userValidation";
+import { TERMS_VERSION, TERMS_URL } from "@/lib/constants";
 
 const registerSchema = z
   .object({
@@ -80,6 +82,9 @@ const registerSchema = z
     confirmPassword: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    acceptTerms: z
+      .boolean()
+      .refine((v) => v === true, "Debes aceptar los Términos y Condiciones"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
@@ -105,6 +110,7 @@ function RegisterContent() {
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -124,6 +130,7 @@ function RegisterContent() {
       department: "",
       province: "",
       district: "",
+      acceptTerms: false,
     },
   });
 
@@ -144,7 +151,8 @@ function RegisterContent() {
       data.province,
       data.district
     ).errors;
-    return Boolean(nameError || phoneError || Object.keys(locationErrors).length);
+    const termsMissing = data.termsAcceptedVersion !== TERMS_VERSION;
+    return Boolean(nameError || phoneError || Object.keys(locationErrors).length || termsMissing);
   };
 
   const routeAfterAuth = async (uid: string) => {
@@ -200,6 +208,8 @@ function RegisterContent() {
           district,
           address,
           updatedAt: new Date(),
+          termsAcceptedVersion: TERMS_VERSION,
+          termsAcceptedAt: new Date(),
         },
         { merge: true }
       );
@@ -547,6 +557,28 @@ function RegisterContent() {
           </div>
         </div>
 
+        <div className="flex items-start gap-3 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            id="acceptTerms"
+            {...register("acceptTerms")}
+            className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          />
+          <label htmlFor="acceptTerms" className="leading-5">
+            Acepto los{" "}
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(true)}
+              className="text-indigo-600 hover:underline"
+            >
+              Términos y Condiciones
+            </button>
+          </label>
+        </div>
+        {errors.acceptTerms && (
+          <p className="text-xs text-red-500">{errors.acceptTerms.message}</p>
+        )}
+
         <div>
           <Button
             type="submit"
@@ -578,6 +610,11 @@ function RegisterContent() {
           </Link>
         </div>
       </div>
+
+      <TermsModal
+        open={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+      />
     </div>
   );
 }

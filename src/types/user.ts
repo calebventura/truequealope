@@ -14,4 +14,6 @@ export interface UserProfile {
   rating?: number | null;
   createdAt?: Date | { toDate: () => Date } | null;
   updatedAt?: Date | { toDate: () => Date } | null;
+  termsAcceptedVersion?: string | null;
+  termsAcceptedAt?: Date | { toDate: () => Date } | null;
 }

@@ -4,6 +4,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { validateProfile } from "@/app/profile/validation";
 import type { User } from "firebase/auth";
+import { TERMS_VERSION } from "@/lib/constants";
 
 /**
  * Hook que obliga a completar el perfil antes de seguir navegando.
@@ -41,13 +42,20 @@ export function useProfileCompletionGuard(
           district: data.district ?? null,
         });
 
-        const isIncomplete = Object.keys(errors).length > 0;
+        const termsMissing =
+          !data.termsAcceptedVersion ||
+          data.termsAcceptedVersion !== TERMS_VERSION;
+
+        const isIncomplete = Object.keys(errors).length > 0 || termsMissing;
         if (!cancelled && isIncomplete) {
           const query = searchParams?.toString();
           const next = encodeURIComponent(
             `${pathname}${query ? `?${query}` : ""}`
           );
-          router.replace(`/profile?completeProfile=1&next=${next}`);
+          const target = termsMissing
+            ? `/profile?acceptTerms=1&next=${next}`
+            : `/profile?completeProfile=1&next=${next}`;
+          router.replace(target);
         }
       } catch (err) {
         console.error("Error verificando perfil completo:", err);

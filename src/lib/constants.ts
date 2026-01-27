@@ -22,3 +22,7 @@ export const DEFAULT_EXPLORE_PAGE_SIZE =
 export const DEFAULT_DASHBOARD_PAGE_SIZE =
   Number(process.env.NEXT_PUBLIC_PAGE_SIZE_DASHBOARD) || 20;
 export const PAGE_SIZE_OPTIONS = [10, 12, 20, 50];
+
+// Términos y condiciones
+export const TERMS_VERSION = "7DA1E5A64C7CA27A15BBB45897820FA0457FB7C8"; // SHA1 de docs/terminos_y_condiciones.txt
+export const TERMS_URL = "/terminos_y_condiciones.txt";

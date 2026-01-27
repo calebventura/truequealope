@@ -24,6 +24,8 @@ import {
   getDistrictsFor,
 } from "@/lib/locations";
 import { validateProfile } from "./validation";
+import { TERMS_VERSION, TERMS_URL } from "@/lib/constants";
+import { TermsModal } from "@/components/TermsModal";
 
 const resolveProfileLocation = (profile: Partial<UserProfile>) => {
   const fallback = parseLocationParts(profile.address ?? null);
@@ -55,6 +57,7 @@ function ProfileContent() {
   const nextParam = searchParams.get("next");
   const nextPath = nextParam?.startsWith("/") ? nextParam : null;
   const mustCompleteProfile = searchParams.get("completeProfile") === "1";
+  const mustAcceptTerms = searchParams.get("acceptTerms") === "1";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +72,9 @@ function ProfileContent() {
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "">("");
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const provinceOptions = selectedDepartment
     ? PROVINCES_BY_DEPARTMENT[selectedDepartment]
     : [];
@@ -78,13 +83,15 @@ function ProfileContent() {
     : [];
 
   useEffect(() => {
-    if (mustCompleteProfile) {
+    if (mustCompleteProfile || mustAcceptTerms) {
       setMessage({
         type: "error",
-        text: "Completa tu perfil para continuar.",
+        text: mustAcceptTerms
+          ? "Debes aceptar los Términos y Condiciones para continuar."
+          : "Completa tu perfil para continuar.",
       });
     }
-  }, [mustCompleteProfile]);
+  }, [mustCompleteProfile, mustAcceptTerms]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -107,6 +114,7 @@ function ProfileContent() {
           setSelectedDepartment(location.department ?? "");
           setSelectedProvince(location.province ?? "");
           setSelectedDistrict(location.district ?? "");
+          setAcceptedTerms(data.termsAcceptedVersion === TERMS_VERSION);
         } else {
           setFormData({
             uid: user.uid,
@@ -123,6 +131,7 @@ function ProfileContent() {
           setSelectedDepartment("");
           setSelectedProvince("");
           setSelectedDistrict("");
+          setAcceptedTerms(false);
         }
 
         if (user.photoURL) {
@@ -214,6 +223,10 @@ function ProfileContent() {
       district: selectedDistrict,
     });
 
+    if (!acceptedTerms) {
+      newErrors.terms = "Debes aceptar los Términos y Condiciones.";
+    }
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       setMessage({ type: "error", text: "Corrige los campos marcados." });
@@ -261,6 +274,8 @@ function ProfileContent() {
         department: departmentValue,
         province: provinceValue,
         district: districtValue,
+        termsAcceptedVersion: TERMS_VERSION,
+        termsAcceptedAt: new Date(),
       };
 
       await setDoc(userRef, updatedData, { merge: true });
@@ -317,9 +332,10 @@ function ProfileContent() {
       normalize(formData.aboutMe) !== normalize(initialProfile.aboutMe) ||
       normalize(formData.department) !== normalize(initialProfile.department) ||
       normalize(formData.province) !== normalize(initialProfile.province) ||
-      normalize(formData.district) !== normalize(initialProfile.district)
+      normalize(formData.district) !== normalize(initialProfile.district) ||
+      (acceptedTerms && initialProfile.termsAcceptedVersion !== TERMS_VERSION)
     );
-  }, [formData, initialProfile, selectedImage]);
+  }, [formData, initialProfile, selectedImage, acceptedTerms]);
 
   if (authLoading || loading) {
     return (
@@ -330,7 +346,7 @@ function ProfileContent() {
   }
 
     return (
-
+      <>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-12 transition-colors duration-300">
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -646,7 +662,7 @@ function ProfileContent() {
 
                       className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border transition-colors"
 
-                      placeholder="+56 9 1234 5678"
+                      placeholder="912345678"
 
                     />
 
@@ -806,7 +822,43 @@ function ProfileContent() {
 
               </div>
 
-  
+              {/* Términos y condiciones */}
+              <div className="sm:col-span-2 flex items-start gap-3 rounded-md border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-900/60">
+                <input
+                  id="acceptTerms"
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <div className="text-sm text-gray-800 dark:text-gray-200">
+                  <label htmlFor="acceptTerms" className="font-medium">
+                    Acepto los{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Términos y Condiciones
+                    </button>
+                  </label>
+                  {formData.termsAcceptedAt && formData.termsAcceptedVersion === TERMS_VERSION && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Aceptados el{" "}
+                      {new Date(
+                        (formData.termsAcceptedAt as any)?.toDate
+                          ? (formData.termsAcceptedAt as any).toDate()
+                          : formData.termsAcceptedAt as Date
+                      ).toLocaleDateString()}
+                    </p>
+                  )}
+                  {errors.terms && (
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                      {errors.terms}
+                    </p>
+                  )}
+                </div>
+              </div>
 
               <div className="pt-5 border-t border-gray-200 dark:border-gray-800 flex justify-end">
 
@@ -825,6 +877,8 @@ function ProfileContent() {
         </div>
 
       </div>
+      <TermsModal open={showTermsModal} onClose={() => setShowTermsModal(false)} />
+      </>
 
     );
 
