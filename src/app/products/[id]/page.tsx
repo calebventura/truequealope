@@ -132,29 +132,35 @@ export default function ProductDetailPage() {
     void loadCommunities();
   }, [user]);
 
-  const openWhatsApp = async (
+  const openExternalLink = (url: string) => {
+    const isSafari =
+      typeof navigator !== "undefined" &&
+      /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    // Safari (especialmente iOS) bloquea con más frecuencia window.open; usa navegación directa
+    if (isSafari) {
+      window.location.href = url;
+      return;
+    }
+
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (!win) {
+      // Fallback adicional si el popup es bloqueado
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.click();
+    }
+  };
+
+  const openWhatsApp = (
     messageText?: string,
     options?: { beforeLog?: () => Promise<void> }
   ) => {
     if (!product) return;
 
-    let fetchedPhone: string | null | undefined;
-    if (!sellerProfile?.phoneNumber) {
-      try {
-        const sellerDoc = await getDoc(doc(db, "users", product.sellerId));
-        const sellerData = sellerDoc.exists()
-          ? (sellerDoc.data() as UserProfile)
-          : null;
-        if (sellerData) {
-          setSellerProfile(sellerData);
-          fetchedPhone = sellerData.phoneNumber ?? null;
-        }
-      } catch (error) {
-        console.error("Error fetching seller profile:", error);
-      }
-    }
-
-    const phone = sellerProfile?.phoneNumber ?? fetchedPhone;
+    const phone = sellerProfile?.phoneNumber;
     if (!phone) {
       showAlert("El vendedor no ha configurado su número de WhatsApp.", {
         tone: "info",
@@ -168,63 +174,67 @@ export default function ProductDetailPage() {
         ? product.wanted.join(", ")
         : "lo que buscas";
     const priceText =
-      product.price != null ? ` (S/. ${product.price.toLocaleString()})` : "";
+      product.price != null ? ` (S/. ${product.price.toLocaleString("es-PE")})` : "";
     const defaultMessage =
       contactIntent === "trade"
         ? `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. Te interesa?`
         : `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?`;
-
-    setContacting(true);
-    try {
-      if (options?.beforeLog) {
-        await options.beforeLog();
-      }
-      if (user) {
-        await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
-        if (user.uid === product.sellerId) {
-          const refreshed = await getContactClicksCount(product.id!, product.sellerId);
-          setContactClicks(refreshed);
-        }
-      }
-    } catch (error) {
-      console.error("Error registrando clic de contacto:", error);
-    } finally {
-      setContacting(false);
-    }
 
     const normalizedPhone = phone.replace(/[^\d]/g, "");
     const finalMessage = messageText ?? defaultMessage;
     const waUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(
       finalMessage
     )}`;
-    window.open(waUrl, "_blank");
+
+    openExternalLink(waUrl);
+
+    // Registro en segundo plano
+    setContacting(true);
+    (async () => {
+      try {
+        if (options?.beforeLog) {
+          await options.beforeLog();
+        }
+        if (user) {
+          await logContactClick(product.id!, user.uid, product.sellerId, "whatsapp");
+          if (user.uid === product.sellerId) {
+            const refreshed = await getContactClicksCount(product.id!, product.sellerId);
+            setContactClicks(refreshed);
+          }
+        }
+      } catch (error) {
+        console.error("Error registrando clic de contacto:", error);
+      } finally {
+        setContacting(false);
+      }
+    })();
   };
 
-  const openInstagram = async () => {
-    if (!user) {
-      router.push(`/auth/login?next=/products/${id}`);
-      return;
-    }
+  const openInstagram = () => {
     if (!product || !sellerProfile?.instagramUser) return;
 
-    setContacting(true);
-    try {
-      await logContactClick(product.id!, user.uid, product.sellerId, "instagram");
-    } catch (error) {
-      console.error("Error registrando clic de contacto instagram:", error);
-    } finally {
-      setContacting(false);
-    }
-
     const igUrl = `https://instagram.com/${sellerProfile.instagramUser}`;
-    window.open(igUrl, "_blank");
+    openExternalLink(igUrl);
+
+    setContacting(true);
+    (async () => {
+      try {
+        if (user) {
+          await logContactClick(product.id!, user.uid, product.sellerId, "instagram");
+        }
+      } catch (error) {
+        console.error("Error registrando clic de contacto instagram:", error);
+      } finally {
+        setContacting(false);
+      }
+    })();
   };
 
   
   const handleContactSale = () => {
     if (!product) return;
     const priceText =
-      product.price != null ? ` (S/. ${product.price.toLocaleString()})` : "";
+      product.price != null ? ` (S/. ${product.price.toLocaleString("es-PE")})` : "";
     const message = `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?`;
     openWhatsApp(message);
   };
@@ -267,7 +277,7 @@ export default function ProductDetailPage() {
 
     setFormError(null);
     const referential =
-      product.price != null ? `S/. ${product.price.toLocaleString()}` : "N/A";
+      product.price != null ? `S/. ${product.price.toLocaleString("es-PE")}` : "N/A";
     const message = `Hola, me interesa permutar tu publicacion "${product.title}". Propongo pagar S/. ${cash.toFixed(2)} y ofrecer: ${offer}. Entiendo que el precio referencial total es ${referential}. Te interesa?`;
 
     await openWhatsApp(message, {
@@ -298,12 +308,16 @@ export default function ProductDetailPage() {
       }
 
       if ("clipboard" in navigator && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        showAlert("Link copiado.", {
-          tone: "success",
-          title: "Listo",
-        });
-        return;
+        try {
+          await navigator.clipboard.writeText(url);
+          showAlert("Link copiado.", {
+            tone: "success",
+            title: "Listo",
+          });
+          return;
+        } catch {
+          // Safari puede fallar con Clipboard API en ciertos contextos
+        }
       }
 
       window.prompt("Copia este enlace:", url);
@@ -460,11 +474,15 @@ export default function ProductDetailPage() {
             viewerId = existing;
           } else {
             const generated = crypto.randomUUID();
-            localStorage.setItem(key, generated);
+            try {
+              localStorage.setItem(key, generated);
+            } catch {
+              // Safari en modo privado puede bloquear localStorage
+            }
             viewerId = generated;
           }
-        } catch (error) {
-          console.warn("No se pudo leer/generar viewer_id", error);
+        } catch {
+          // Safari en modo privado puede bloquear localStorage
           return;
         }
       }
@@ -565,7 +583,7 @@ export default function ProductDetailPage() {
   const sellerLocation = sellerProfile?.address || sellerLocationParts || null;
   const sellerCreatedAt = resolveProfileDate(sellerProfile?.createdAt);
   const sellerSinceLabel = sellerCreatedAt
-    ? sellerCreatedAt.toLocaleDateString()
+    ? sellerCreatedAt.toLocaleDateString("es-PE")
     : null;
   const sellerStatusMessage = sellerLoading
     ? "Cargando datos del vendedor..."
@@ -787,7 +805,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {product.createdAt.toLocaleDateString()}
+                    {product.createdAt.toLocaleDateString("es-PE")}
                   </span>
                 </div>
 
@@ -827,14 +845,14 @@ export default function ProductDetailPage() {
                     </p>
                     {referentialPrice !== null && (
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Valor referencial: S/. {referentialPrice.toLocaleString()}
+                        Valor referencial: S/. {referentialPrice.toLocaleString("es-PE")}
                       </p>
                     )}
                   </div>
                 ) : isPermuta && referentialPrice !== null ? (
                   <div className="flex flex-col gap-1 mb-2">
                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {`S/. ${referentialPrice.toLocaleString()}`}
+                      {`S/. ${referentialPrice.toLocaleString("es-PE")}`}
                     </p>
                     <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 font-medium">
@@ -864,7 +882,7 @@ export default function ProductDetailPage() {
                 ) : acceptsMoney && referentialPrice !== null ? (
                   <div className="flex flex-col gap-1 mb-2">
                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {`S/. ${referentialPrice.toLocaleString()}`}
+                      {`S/. ${referentialPrice.toLocaleString("es-PE")}`}
                     </p>
                     {acceptsTrade && !isPermuta && (
                       <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
@@ -874,7 +892,7 @@ export default function ProductDetailPage() {
                   </div>
                 ) : referentialPrice !== null ? (
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Valor referencial: S/. {referentialPrice.toLocaleString()}
+                    Valor referencial: S/. {referentialPrice.toLocaleString("es-PE")}
                   </p>
                 ) : (
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -1266,7 +1284,7 @@ export default function ProductDetailPage() {
                                   Monto:{" "}
                                 </span>
                                 <span className="font-medium">
-                                  S/. {product.finalDealPrice.toLocaleString()}
+                                  S/. {product.finalDealPrice.toLocaleString("es-PE")}
                                 </span>
                               </p>
                             )}

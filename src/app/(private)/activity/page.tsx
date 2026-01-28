@@ -729,9 +729,9 @@ function SellerActivity({ userId }: { userId: string }) {
                          return `Comprador ID: ${order.buyerId.slice(0, 8)}...`;
                        })()}
                      </p>
-                     <p className="text-sm text-gray-500 dark:text-gray-400">{order.createdAt.toLocaleString()}</p>
+                     <p className="text-sm text-gray-500 dark:text-gray-400">{order.createdAt.toLocaleString("es-PE")}</p>
                      <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                       S/. {typeof order.price === "number" ? order.price.toLocaleString() : "0"}
+                       S/. {typeof order.price === "number" ? order.price.toLocaleString("es-PE") : "0"}
                      </p>
                   </div>
                  <div className="flex gap-2 w-full md:w-auto">
@@ -937,8 +937,8 @@ function SellerActivity({ userId }: { userId: string }) {
                       return (
                         <p className="text-indigo-600 dark:text-indigo-400 font-bold">
                           {showsMoney
-                            ? `S/. ${product.price.toLocaleString()}`
-                            : `Valor referencial: S/. ${product.price.toLocaleString()}`}
+                            ? `S/. ${product.price.toLocaleString("es-PE")}`
+                            : `Valor referencial: S/. ${product.price.toLocaleString("es-PE")}`}
                         </p>
                       );
                     }
@@ -949,7 +949,7 @@ function SellerActivity({ userId }: { userId: string }) {
                     );
                   })()}
                   <p className="text-sm text-gray-500 dark:text-gray-400 md:hidden">
-                    {product.createdAt.toLocaleDateString()}
+                    {product.createdAt.toLocaleDateString("es-PE")}
                   </p>
             <div className="mt-1 md:hidden">
               <span
@@ -978,7 +978,7 @@ function SellerActivity({ userId }: { userId: string }) {
               </div>
 
               <div className="hidden md:block text-sm text-gray-500 dark:text-gray-400">
-                {product.createdAt.toLocaleDateString()}
+                {product.createdAt.toLocaleDateString("es-PE")}
               </div>
 
               <div className="hidden md:block">
@@ -1116,7 +1116,7 @@ function SellerActivity({ userId }: { userId: string }) {
                     {product.finalDealPrice != null && (
                       <div>
                         <span className="text-xs text-gray-500 dark:text-gray-400">Monto</span>
-                        <p className="font-medium">S/. {product.finalDealPrice.toLocaleString()}</p>
+                        <p className="font-medium">S/. {product.finalDealPrice.toLocaleString("es-PE")}</p>
                       </div>
                     )}
                     {product.finalDealItems && (
@@ -1316,7 +1316,7 @@ function SellerActivity({ userId }: { userId: string }) {
             <strong>
               S/.{" "}
               {typeof confirmOrderModal.price === "number"
-                ? confirmOrderModal.price.toLocaleString()
+                ? confirmOrderModal.price.toLocaleString("es-PE")
                 : "0"}
             </strong>. ¿Deseas continuar?
           </p>
@@ -1613,7 +1613,7 @@ function BuyerActivity({ userId }: { userId: string }) {
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {categoryName ? `${categoryName} · ` : ""}
-                            Ultimo: {item.lastAt.toLocaleDateString()}
+                            Ultimo: {item.lastAt.toLocaleDateString("es-PE")}
                           </p>
                         </div>
                         <div className="text-right">
@@ -1660,7 +1660,7 @@ function BuyerActivity({ userId }: { userId: string }) {
             {orders.map((order) => {
               const priceText =
                 typeof order.price === "number"
-                  ? order.price.toLocaleString()
+                  ? order.price.toLocaleString("es-PE")
                   : "N/D";
 
               return (
@@ -1671,7 +1671,7 @@ function BuyerActivity({ userId }: { userId: string }) {
                         {order.productTitle}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {toDate(order.createdAt)?.toLocaleDateString() ?? ""}
+                        {toDate(order.createdAt)?.toLocaleDateString("es-PE") ?? ""}
                       </p>
                       <p className="mt-1 text-sm font-bold text-gray-900 dark:text-gray-100">
                         S/. {priceText}

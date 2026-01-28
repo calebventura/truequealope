@@ -19,8 +19,13 @@ const STORAGE_KEY = "theme";
 
 const readStoredTheme = (): Theme => {
   if (typeof window === "undefined") return "light";
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored === "light" || stored === "dark" ? stored : "light";
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === "light" || stored === "dark" ? stored : "light";
+  } catch {
+    // Safari en modo privado puede bloquear localStorage
+    return "light";
+  }
 };
 
 const subscribeToTheme = (callback: () => void) => {
@@ -56,7 +61,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, nextTheme);
+    try {
+      localStorage.setItem(STORAGE_KEY, nextTheme);
+    } catch {
+      // Safari en modo privado puede bloquear localStorage
+    }
     emitThemeChange();
   };
 

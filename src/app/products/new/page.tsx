@@ -324,7 +324,12 @@ export default function NewProductPage() {
 
     if (el) {
 
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Safari antiguo no soporta behavior: 'smooth', usar fallback
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        el.scrollIntoView({ block: "center" });
+      }
 
       el.focus?.({ preventScroll: true });
 
@@ -422,8 +427,12 @@ export default function NewProductPage() {
   useEffect(() => {
 
     // Restaurar borrador si existe (sin imágenes)
-
-    const draftRaw = localStorage.getItem(DRAFT_KEY);
+    let draftRaw: string | null = null;
+    try {
+      draftRaw = localStorage.getItem(DRAFT_KEY);
+    } catch {
+      // Safari en modo privado puede bloquear localStorage
+    }
 
     if (draftRaw) {
 
@@ -495,7 +504,11 @@ export default function NewProductPage() {
 
     void _images;
 
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(rest));
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(rest));
+    } catch {
+      // Safari en modo privado puede bloquear localStorage
+    }
 
   };
 
@@ -883,7 +896,11 @@ export default function NewProductPage() {
 
 
 
-      localStorage.removeItem(DRAFT_KEY);
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Safari en modo privado puede bloquear localStorage
+      }
 
       router.push("/activity?tab=seller");
 
@@ -1677,7 +1694,7 @@ export default function NewProductPage() {
                 Comunidades (opcional)
               </label>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                Si seleccionas una o más, tu publicación solo será visible en esas comunidades.
+                Estas comunidades son referenciales, las publicaciones en general son públicas.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {COMMUNITIES.map((community) => {

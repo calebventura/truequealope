@@ -123,7 +123,7 @@ export function ProductCard({
                   </p>
                   {referentialPrice !== null && (
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                      Valor referencial: S/. {referentialPrice.toLocaleString()}
+                      Valor referencial: S/. {referentialPrice.toLocaleString("es-PE")}
                     </p>
                   )}
                 </div>
@@ -134,7 +134,7 @@ export function ProductCard({
               return (
                 <div className="flex flex-col gap-1">
                   <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                    S/. {referentialPrice.toLocaleString()}
+                    S/. {referentialPrice.toLocaleString("es-PE")}
                   </p>
                   <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
                     Precio referencial total
@@ -146,7 +146,7 @@ export function ProductCard({
             if (acceptsMoney && referentialPrice !== null) {
               return (
                 <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                  S/. {referentialPrice.toLocaleString()}
+                  S/. {referentialPrice.toLocaleString("es-PE")}
                 </p>
               );
             }
@@ -154,7 +154,7 @@ export function ProductCard({
             if (referentialPrice !== null) {
               return (
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Valor referencial: S/. {referentialPrice.toLocaleString()}
+                  Valor referencial: S/. {referentialPrice.toLocaleString("es-PE")}
                 </p>
               );
             }

@@ -849,7 +849,7 @@ function ProfileContent() {
                         (formData.termsAcceptedAt as any)?.toDate
                           ? (formData.termsAcceptedAt as any).toDate()
                           : formData.termsAcceptedAt as Date
-                      ).toLocaleDateString()}
+                      ).toLocaleDateString("es-PE")}
                     </p>
                   )}
                   {errors.terms && (
