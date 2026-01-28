@@ -1550,8 +1550,9 @@ function BuyerActivity({ userId }: { userId: string }) {
     }
 
     const normalizedPhone = phone.replace(/[^\d]/g, "");
+    const productUrl = `${window.location.origin}/products/${order.productId}`;
     const message = encodeURIComponent(
-      `Hola, vi tu producto "${order.productTitle}" en Truequéalope. ¿Sigue disponible?`
+      `Hola, vi tu producto "${order.productTitle}" en Truequéalope. ¿Sigue disponible?\n${productUrl}`
     );
     const waUrl = `https://wa.me/${normalizedPhone}?text=${message}`;
     window.open(waUrl, "_blank");

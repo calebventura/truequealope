@@ -156,9 +156,12 @@ La aplicación estará disponible en `http://localhost:3000`.
 - Categoría “Otros”: el formulario de alta y edición obliga a ingresar `otherCategoryLabel` (texto libre). En los listados se etiqueta como “Otros” y en detalle muestra el label personalizado.
 
 ## 10. UX de contacto y permuta (resumen)
+- **Autenticación obligatoria**: los botones de contacto (WhatsApp e Instagram) redirigen a login si el usuario no tiene sesión activa (`/auth/login?next=/products/{id}`). Aplica a `openWhatsApp`, `openInstagram`, `handleContactSale`, `handleContactTrade` y `handleContactPermuta`.
 - Venta: el mensaje de WhatsApp expresa que el comprador pagará el precio completo.
 - Trueque: el interesado debe escribir qué ofrece antes de contactar; se inyecta en el mensaje.
 - Permuta: el interesado debe ingresar producto/servicio ofrecido y monto; ambos se guardan como oferta (`products/{productId}/offers`) y se usan en el mensaje. El precio se muestra como "Precio referencial total" con tooltip explicativo.
+- **Link en mensajes**: todos los mensajes de WhatsApp incluyen automáticamente el link al producto (`${window.location.origin}/products/${id}`), tanto desde el detalle del producto como desde la sección de actividad del comprador.
+- **"Busco a cambio" siempre visible**: cuando el vendedor definió qué busca, se muestra siempre en el detalle, independientemente de la intención de contacto seleccionada (pagar/trueque).
 - Formulario de publicación: en Permuta el vendedor solo define el precio referencial total (sin monto diferencial) y los campos "qué buscas" son requeridos según el tipo de intercambio.
 - Cierre de operaciones en dashboard vendedor: se exige asignar usuario por correo; al marcar vendido se capturan y guardan en el producto los datos finales (`finalBuyerContact`, `finalBuyerUserId`, `finalDealPrice`, `finalDealItems`, `finalizedAt`) y se muestran en historial y detalle.
 
@@ -174,3 +177,21 @@ La aplicación estará disponible en `http://localhost:3000`.
 - Fechas: usar formato `YYYY-MM-DD` en `startAt` y `endAt` (inclusive, zona local).
 - Script admin: `node scripts/tag-products.js --productIds id1,id2 --addTags moving-urgent --yes` (soporta `--removeTags` y `--dry-run`).
 - Script admin: `node scripts/list-products.js --categoryIds home,other --status active,reserved --limit 20` (imprime ids para tagging).
+
+## 12. Ordenamiento de productos
+- Disponible en Home (`/`) y Search (`/search`) mediante un selector `<select>` junto al botón de filtros.
+- Opciones definidas como constantes en `src/lib/constants.ts` (`SORT_OPTIONS`, tipo `SortOption`):
+  - `newest` — Más recientes (default)
+  - `popular` — Más populares (por `viewCount`)
+  - `price_asc` — Menor precio
+  - `price_desc` — Mayor precio
+- Productos sin precio se posicionan al final en los ordenamientos por precio.
+- Se persiste en la URL como `?sort=popular` (el valor default `newest` se omite). Compatible con el resto de parámetros de filtro.
+- La lógica de ordenamiento se ejecuta en cliente después de aplicar todos los filtros.
+
+## 13. Compatibilidad entre navegadores (Chrome / Safari)
+- **`toLocaleString` y `toLocaleDateString`**: todos los usos especifican locale `"es-PE"` para formato consistente de precios y fechas.
+- **`localStorage`**: envuelto en `try-catch` en `ThemeContext`, `products/new` (borradores) y `products/[id]` (viewer_id). Safari en modo privado lanza excepciones al acceder a localStorage.
+- **`scrollIntoView`**: `behavior: 'smooth'` con fallback por `try-catch` para Safari antiguo.
+- **Clipboard API**: `navigator.clipboard.writeText` con `try-catch` y fallback a `window.prompt`.
+- **Detección de Safari**: `openExternalLink` en `products/[id]/page.tsx` ya detecta Safari para usar `window.location.href` en lugar de `window.open`.

@@ -1,6 +1,6 @@
 # Reglas de Negocio y Lógica del Sistema - Truequealo.pe
 
-Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
+Este documento consolida las reglas vigentes (actualizado al 28/01/2026).
 
 ## 1. Ciclo de Vida del Producto y Compra
 
@@ -51,9 +51,12 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 - Categoría **“Otros”**: obliga a describir la categoría en texto (`otherCategoryLabel`) tanto al crear como al editar.
 
 ## 7. Contacto y ofertas (detalle de producto)
+- **Autenticación requerida**: todos los botones de contacto (WhatsApp e Instagram) requieren sesión activa. Si el usuario no está logueado, se redirige a `/auth/login?next=/products/{id}` y al completar el login vuelve al producto.
 - **Venta**: el mensaje de WhatsApp indica que el comprador quiere pagar el precio completo.
 - **Trueque**: el interesado debe escribir qué ofrece antes de abrir WhatsApp; el mensaje se personaliza con su texto.
 - **Permuta**: el interesado debe ingresar producto/servicio ofrecido y monto; ambos van en el mensaje. Antes de abrir WhatsApp se registra la oferta.
+- **Link del producto**: todos los mensajes de WhatsApp incluyen automáticamente el link directo al producto (`{origin}/products/{id}`), tanto en la página de detalle como en la sección de actividad.
+- **"Busco a cambio"**: cuando el vendedor especificó qué busca a cambio, esta información se muestra siempre en el detalle del producto, independientemente de si el interesado seleccionó "Pagar precio" u "Ofrecer trueque". Es información del producto, no de la acción del comprador.
 - **Tooltip**: en Permuta se muestra ayuda al lado del precio explicando "Precio referencial total".
 - Botones de contacto visibles según datos del vendedor: si no hay teléfono, solo Instagram; si hay ambos, se muestran ambos botones.
 
@@ -87,5 +90,17 @@ Este documento consolida las reglas vigentes (actualizado al 27/12/2025).
 
 ## 12. Búsqueda y exploración
 - El buscador de `/search` solo filtra al presionar **Buscar** (clic o Enter); no filtra por carácter para evitar parpadeos.
+- **Ordenamiento**: tanto en Home (`/`) como en Search (`/search`) hay un selector "Ordenar" con las opciones:
+  - **Más recientes** (default): por fecha de creación descendente.
+  - **Más populares**: por cantidad de vistas descendente.
+  - **Menor precio**: precio ascendente (productos sin precio al final).
+  - **Mayor precio**: precio descendente (productos sin precio al final).
+- El ordenamiento se persiste en la URL con `?sort=newest|popular|price_asc|price_desc`, permitiendo compartir búsquedas ordenadas. El valor por defecto (`newest`) no se incluye en la URL para mantenerla limpia.
 - Paginación en cliente: botón **Mostrar más** en home y search. Tamaño por defecto 12 (configurable vía `NEXT_PUBLIC_PAGE_SIZE_EXPLORE`).
 - Dashboard vendedor: paginación con selector 10/12/20/50 (default 20; `NEXT_PUBLIC_PAGE_SIZE_DASHBOARD`).
+
+## 13. Compatibilidad entre navegadores
+- **Formato numérico y de fechas**: todos los `toLocaleString()` y `toLocaleDateString()` especifican locale `"es-PE"` para garantizar formato consistente entre Chrome y Safari.
+- **localStorage**: todos los accesos están envueltos en `try-catch` para soportar Safari en modo de navegación privada, donde `localStorage` puede lanzar excepciones.
+- **scrollIntoView**: usa fallback cuando `behavior: 'smooth'` no es soportado (Safari antiguo).
+- **Clipboard API**: el botón compartir usa `try-catch` con fallback a `window.prompt` si el navegador no soporta `navigator.clipboard`.

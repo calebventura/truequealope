@@ -28,6 +28,16 @@ Este documento describe el plan de implementación para las nuevas funcionalidad
 - [x] Persistencia de datos (Draft) durante el flujo de login/registro.
 - [x] Restauración automática de datos al volver.
 
+### Mejoras transversales (28/01/2026)
+
+**Enfoque:** Compatibilidad, ordenamiento y seguridad de contacto.
+
+- [x] Compatibilidad Chrome/Safari: `toLocaleString("es-PE")`, `localStorage` con try-catch, `scrollIntoView` fallback, Clipboard API fallback.
+- [x] Ordenamiento de productos en Home y Search: más recientes, más populares, menor/mayor precio. Persistido en URL (`?sort=`).
+- [x] Autenticación obligatoria en botones de contacto (WhatsApp e Instagram). Redirige a login con retorno al producto.
+- [x] "Busco a cambio" siempre visible en detalle de producto (no depende de la intención de contacto).
+- [x] Link del producto incluido automáticamente en todos los mensajes de WhatsApp.
+
 ---
 
-**Estado Actual:** Release 1.2 Completado.
+**Estado Actual:** Mejoras transversales completadas.

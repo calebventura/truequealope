@@ -180,10 +180,11 @@ export default function ProductDetailPage() {
         : "lo que buscas";
     const priceText =
       product.price != null ? ` (S/. ${product.price.toLocaleString("es-PE")})` : "";
+    const productUrl = `${window.location.origin}/products/${product.id}`;
     const defaultMessage =
       contactIntent === "trade"
-        ? `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. Te interesa?`
-        : `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?`;
+        ? `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: _____. Te interesa?\n${productUrl}`
+        : `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?\n${productUrl}`;
 
     const normalizedPhone = phone.replace(/[^\d]/g, "");
     const finalMessage = messageText ?? defaultMessage;
@@ -245,7 +246,8 @@ export default function ProductDetailPage() {
     if (!product) return;
     const priceText =
       product.price != null ? ` (S/. ${product.price.toLocaleString("es-PE")})` : "";
-    const message = `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?`;
+    const productUrl = `${window.location.origin}/products/${product.id}`;
+    const message = `Hola, vi tu publicacion "${product.title}" en Truequealope y estoy interesado en pagar el precio completo${priceText}. Sigue disponible?\n${productUrl}`;
     openWhatsApp(message);
   };
 
@@ -261,7 +263,8 @@ export default function ProductDetailPage() {
       product.wanted && product.wanted.length > 0
         ? product.wanted.join(", ")
         : "lo que buscas";
-    const message = `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: ${offer}. Te interesa?`;
+    const productUrl = `${window.location.origin}/products/${product.id}`;
+    const message = `Hola, me interesa tu publicacion "${product.title}" para trueque. Buscas: ${wantedList}. Te puedo ofrecer: ${offer}. Te interesa?\n${productUrl}`;
     openWhatsApp(message);
   };
 
@@ -288,7 +291,8 @@ export default function ProductDetailPage() {
     setFormError(null);
     const referential =
       product.price != null ? `S/. ${product.price.toLocaleString("es-PE")}` : "N/A";
-    const message = `Hola, me interesa permutar tu publicacion "${product.title}". Propongo pagar S/. ${cash.toFixed(2)} y ofrecer: ${offer}. Entiendo que el precio referencial total es ${referential}. Te interesa?`;
+    const productUrl = `${window.location.origin}/products/${product.id}`;
+    const message = `Hola, me interesa permutar tu publicacion "${product.title}". Propongo pagar S/. ${cash.toFixed(2)} y ofrecer: ${offer}. Entiendo que el precio referencial total es ${referential}. Te interesa?\n${productUrl}`;
 
     await openWhatsApp(message, {
       beforeLog: async () => {
