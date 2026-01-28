@@ -160,6 +160,11 @@ export default function ProductDetailPage() {
   ) => {
     if (!product) return;
 
+    if (!user) {
+      router.push(`/auth/login?next=/products/${id}`);
+      return;
+    }
+
     const phone = sellerProfile?.phoneNumber;
     if (!phone) {
       showAlert("El vendedor no ha configurado su número de WhatsApp.", {
@@ -212,6 +217,11 @@ export default function ProductDetailPage() {
 
   const openInstagram = () => {
     if (!product || !sellerProfile?.instagramUser) return;
+
+    if (!user) {
+      router.push(`/auth/login?next=/products/${id}`);
+      return;
+    }
 
     const igUrl = `https://instagram.com/${sellerProfile.instagramUser}`;
     openExternalLink(igUrl);
