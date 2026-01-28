@@ -23,6 +23,18 @@ export const DEFAULT_DASHBOARD_PAGE_SIZE =
   Number(process.env.NEXT_PUBLIC_PAGE_SIZE_DASHBOARD) || 20;
 export const PAGE_SIZE_OPTIONS = [10, 12, 20, 50];
 
+// Ordenamiento
+export type SortOption = "newest" | "popular" | "price_asc" | "price_desc";
+
+export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "newest", label: "Más recientes" },
+  { value: "popular", label: "Más populares" },
+  { value: "price_asc", label: "Menor precio" },
+  { value: "price_desc", label: "Mayor precio" },
+];
+
+export const DEFAULT_SORT: SortOption = "newest";
+
 // Términos y condiciones
 export const TERMS_VERSION = "7DA1E5A64C7CA27A15BBB45897820FA0457FB7C8"; // SHA1 de docs/terminos_y_condiciones.txt
 export const TERMS_URL = "/terminos_y_condiciones.txt";

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
-import { CATEGORIES, DEFAULT_EXPLORE_PAGE_SIZE } from "@/lib/constants";
+import { CATEGORIES, DEFAULT_EXPLORE_PAGE_SIZE, SORT_OPTIONS, DEFAULT_SORT, SortOption } from "@/lib/constants";
 import {
   TrendConfig,
   getActiveTrends,
@@ -43,6 +43,7 @@ function SearchContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [communityFilters, setCommunityFilters] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>(DEFAULT_SORT);
   const nowTimestamp = Date.now();
   const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [visibleCount, setVisibleCount] = useState(DEFAULT_EXPLORE_PAGE_SIZE);
@@ -80,6 +81,12 @@ function SearchContent() {
         ["product", "service"].includes(v)
       )
     );
+    const sortParam = searchParams.get("sort");
+    if (sortParam && SORT_OPTIONS.some((opt) => opt.value === sortParam)) {
+      setSortBy(sortParam as SortOption);
+    } else {
+      setSortBy(DEFAULT_SORT);
+    }
     setFiltersHydrated(true);
   }, [searchParams]);
 
@@ -91,6 +98,9 @@ function SearchContent() {
     communityFilters.forEach((id) => params.append("community", id));
     exchangeFilters.forEach((id) => params.append("exchange", id));
     listingFilters.forEach((id) => params.append("listing", id));
+    if (sortBy !== DEFAULT_SORT) {
+      params.set("sort", sortBy);
+    }
 
     const nextQuery = params.toString();
     const currentQuery = searchParams.toString();
@@ -106,6 +116,7 @@ function SearchContent() {
     pathname,
     router,
     searchParams,
+    sortBy,
     debouncedSearch,
     selectedCategories,
     selectedTrends,
@@ -122,6 +133,7 @@ function SearchContent() {
     communityFilters,
     exchangeFilters,
     listingFilters,
+    sortBy,
   ]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -204,6 +216,7 @@ function SearchContent() {
     setCommunityFilters([]);
     setExchangeFilters([]);
     setListingFilters([]);
+    setSortBy(DEFAULT_SORT);
     router.push("/search");
   };
 
@@ -345,16 +358,6 @@ function SearchContent() {
              return true;
         });
 
-        results.sort((a, b) => {
-            // Priority: Active/Reserved (0) < Sold (1)
-            const scoreA = a.status === 'sold' ? 1 : 0;
-            const scoreB = b.status === 'sold' ? 1 : 0;
-            
-            if (scoreA !== scoreB) return scoreA - scoreB;
-            
-            return b.createdAt.getTime() - a.createdAt.getTime();
-        });
-
         setProducts(results);
       } catch (error) {
         console.error("Error buscando productos:", error);
@@ -418,7 +421,34 @@ function SearchContent() {
       );
     }
 
-    return filtered;
+    // Aplicar ordenamiento
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case "newest":
+        sorted.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        break;
+      case "popular":
+        sorted.sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0));
+        break;
+      case "price_asc":
+        sorted.sort((a, b) => {
+          if (a.price == null && b.price == null) return 0;
+          if (a.price == null) return 1;
+          if (b.price == null) return -1;
+          return a.price - b.price;
+        });
+        break;
+      case "price_desc":
+        sorted.sort((a, b) => {
+          if (a.price == null && b.price == null) return 0;
+          if (a.price == null) return 1;
+          if (b.price == null) return -1;
+          return b.price - a.price;
+        });
+        break;
+    }
+
+    return sorted;
   }, [
     products,
     applyTrendFilters,
@@ -428,6 +458,7 @@ function SearchContent() {
     communityFilters,
     exchangeFilters,
     listingFilters,
+    sortBy,
   ]);
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
@@ -466,41 +497,60 @@ function SearchContent() {
               </div>
             </form>
 
-            <FiltersPanel
-              activeCount={activeFilterCount}
-              pills={activeFilterPills}
-              onClearAll={clearAllFilters}
-              emptyLabel="Sin filtros activos"
-              category={{
-                values: selectedCategories,
-                options: CATEGORIES,
-                onApply: setSelectedCategories,
-              }}
-              trend={{
-                values: selectedTrends,
-                options: trendOptions,
-                onApply: setSelectedTrends,
-              }}
-              community={{
-                values: communityFilters,
-                options: [
-                  { id: "all", name: "Todas" },
-                  { id: "public", name: "Publico" },
-                  ...COMMUNITIES,
-                ],
-                onApply: setCommunityFilters,
-              }}
-              exchange={{
-                values: exchangeFilters,
-                labels: exchangeLabels,
-                onApply: setExchangeFilters,
-              }}
-              listing={{
-                values: listingFilters,
-                labels: listingLabels,
-                onApply: setListingFilters,
-              }}
-            />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <FiltersPanel
+                activeCount={activeFilterCount}
+                pills={activeFilterPills}
+                onClearAll={clearAllFilters}
+                emptyLabel="Sin filtros activos"
+                category={{
+                  values: selectedCategories,
+                  options: CATEGORIES,
+                  onApply: setSelectedCategories,
+                }}
+                trend={{
+                  values: selectedTrends,
+                  options: trendOptions,
+                  onApply: setSelectedTrends,
+                }}
+                community={{
+                  values: communityFilters,
+                  options: [
+                    { id: "all", name: "Todas" },
+                    { id: "public", name: "Publico" },
+                    ...COMMUNITIES,
+                  ],
+                  onApply: setCommunityFilters,
+                }}
+                exchange={{
+                  values: exchangeFilters,
+                  labels: exchangeLabels,
+                  onApply: setExchangeFilters,
+                }}
+                listing={{
+                  values: listingFilters,
+                  labels: listingLabels,
+                  onApply: setListingFilters,
+                }}
+              />
+              <div className="flex items-center gap-2 sm:ml-auto">
+                <label htmlFor="sort-select-search" className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                  Ordenar:
+                </label>
+                <select
+                  id="sort-select-search"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 

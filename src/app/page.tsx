@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
 import { Product } from "@/types/product";
-import { CATEGORIES, DEFAULT_EXPLORE_PAGE_SIZE } from "@/lib/constants";
+import { CATEGORIES, DEFAULT_EXPLORE_PAGE_SIZE, SORT_OPTIONS, DEFAULT_SORT, SortOption } from "@/lib/constants";
 import {
   TrendConfig,
   getActiveTrends,
@@ -37,6 +37,7 @@ function HomePageContent() {
   const [communityFilters, setCommunityFilters] = useState<string[]>([]);
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [trendFilters, setTrendFilters] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>(DEFAULT_SORT);
   const [visibleCount, setVisibleCount] = useState(DEFAULT_EXPLORE_PAGE_SIZE);
   const trendOptions = getActiveTrends();
   const nowTimestamp = Date.now();
@@ -70,6 +71,12 @@ function HomePageContent() {
         ["product", "service"].includes(v)
       )
     );
+    const sortParam = searchParams.get("sort");
+    if (sortParam && SORT_OPTIONS.some((opt) => opt.value === sortParam)) {
+      setSortBy(sortParam as SortOption);
+    } else {
+      setSortBy(DEFAULT_SORT);
+    }
     setFiltersHydrated(true);
   }, [searchParams]);
 
@@ -80,6 +87,9 @@ function HomePageContent() {
     communityFilters.forEach((id) => params.append("community", id));
     exchangeFilters.forEach((id) => params.append("exchange", id));
     listingFilters.forEach((id) => params.append("listing", id));
+    if (sortBy !== DEFAULT_SORT) {
+      params.set("sort", sortBy);
+    }
 
     const nextQuery = params.toString();
     const currentQuery = searchParams.toString();
@@ -96,6 +106,7 @@ function HomePageContent() {
     pathname,
     router,
     searchParams,
+    sortBy,
     trendFilters,
   ]);
 
@@ -110,6 +121,7 @@ function HomePageContent() {
     communityFilters,
     exchangeFilters,
     listingFilters,
+    sortBy,
   ]);
 
   useEffect(() => {
@@ -138,8 +150,6 @@ function HomePageContent() {
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
         const validProducts = productsData.filter(p => p.status !== 'sold');
-
-        validProducts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         setProducts(validProducts);
       } catch (error) {
@@ -247,11 +257,42 @@ function HomePageContent() {
       ? true
       : exchangeFilters.some((filter) => matchesExchangeFilter(product, filter))
   );
-  const filteredProducts = exchangeFiltered.filter((product) =>
+  const listingFiltered = exchangeFiltered.filter((product) =>
     listingFilters.length === 0
       ? true
       : listingFilters.some((filter) => matchesListingFilter(product, filter))
   );
+
+  const sortProducts = (items: Product[]): Product[] => {
+    const sorted = [...items];
+    switch (sortBy) {
+      case "newest":
+        sorted.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        break;
+      case "popular":
+        sorted.sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0));
+        break;
+      case "price_asc":
+        sorted.sort((a, b) => {
+          if (a.price == null && b.price == null) return 0;
+          if (a.price == null) return 1;
+          if (b.price == null) return -1;
+          return a.price - b.price;
+        });
+        break;
+      case "price_desc":
+        sorted.sort((a, b) => {
+          if (a.price == null && b.price == null) return 0;
+          if (a.price == null) return 1;
+          if (b.price == null) return -1;
+          return b.price - a.price;
+        });
+        break;
+    }
+    return sorted;
+  };
+
+  const filteredProducts = sortProducts(listingFiltered);
 
   const exchangeLabels: Record<ExchangeFilter, string> = {
     all: "Todos",
@@ -407,8 +448,30 @@ function HomePageContent() {
         </section>
 
 
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            Productos
+          </h2>
+          <div className="flex items-center gap-3">
+            <label htmlFor="sort-select" className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+              Ordenar:
+            </label>
+            <select
+              id="sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <FiltersPanel
-          title="Productos recientes"
           activeCount={activeFilterCount}
           pills={activeFilterPills}
           onClearAll={clearAllFilters}
