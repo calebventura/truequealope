@@ -910,7 +910,7 @@ export default function ProductDetailPage() {
                   </p>
                 )}
 
-                {shouldShowTradeFields && wantedPreview && (
+                {wantedPreview && (
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                       Busco a cambio:
